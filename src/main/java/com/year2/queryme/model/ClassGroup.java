@@ -4,29 +4,21 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "students")
+@Table(name = "class_groups")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Student {
+public class ClassGroup {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String fullName;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "user_id", referencedColumnName = "id")
-    private User user;
+    private String name; // e.g., "Section A", "Batch 2026"
 
     @ManyToOne
     @JoinColumn(name = "course_id")
     private Course course;
-
-    @ManyToOne
-    @JoinColumn(name = "class_group_id")
-    private ClassGroup classGroup;
 }
