@@ -11,3 +11,9 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+
+# JWT Configuration
+queryme:
+  app:
+    jwtSecret: ${JWT_SECRET:QueryMeApplicationSecretKeyMustBeLongEnoughForHMACSHA256SignatureAlgorithm}
+    jwtExpirationMs: ${JWT_EXPIRATION:86400000}
