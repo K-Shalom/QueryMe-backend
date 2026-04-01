@@ -1,4 +1,7 @@
 package com.year2.queryme.model.enums;
 
-public class VisibilityMode {
+public enum VisibilityMode {
+    IMMEDIATE,
+    END_OF_EXAM,
+    NEVER
 }
