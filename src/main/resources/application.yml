@@ -2,7 +2,7 @@ spring:
   application:
     name: QueryMe-backend
   datasource:
-    url: jdbc:postgresql://${DB_HOST}/${DB_NAME}
+    url: jdbc:postgresql://${DB_HOST}/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver

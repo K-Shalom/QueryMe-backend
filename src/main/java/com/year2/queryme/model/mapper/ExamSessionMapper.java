@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 public class ExamSessionMapper {
 
-    public static ExamSessionResponse toResponse(ExamSession session) {
+    public static <ExamSession> ExamSessionResponse toResponse(ExamSession session) {
         ExamSessionResponse res = new ExamSessionResponse();
         res.setId(session.getId());
         res.setExamId(session.getExamId());
