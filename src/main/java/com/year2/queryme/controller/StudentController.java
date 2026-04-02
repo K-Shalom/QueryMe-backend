@@ -39,4 +39,10 @@ public class StudentController {
     public List<Student> getAll() {
         return studentRepository.findAll();
     }
+
+    @GetMapping("/{id}")
+    public Student getById(@PathVariable Long id) {
+        return studentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Student not found with id: " + id));
+    }
 }

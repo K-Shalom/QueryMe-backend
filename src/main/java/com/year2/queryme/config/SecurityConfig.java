@@ -26,7 +26,7 @@ public class SecurityConfig {
 
     // ✅ Constructor Injection (BEST PRACTICE)
     public SecurityConfig(JwtAuthFilter jwtAuthFilter,
-                          UserDetailsServiceImpl userDetailsService) {
+            UserDetailsServiceImpl userDetailsService) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
     }
@@ -37,24 +37,26 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
 
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
 
                         // ── Public endpoints ─────────────────────────────
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/signup").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/teachers/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admins/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/guests/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/courses").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/class-groups").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/courses").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/class-groups/**").permitAll()
 
                         // ── Public read ─────────────────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/courses").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/class-groups/**").permitAll()
 
-                        // ── TEACHER ────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST, "/api/courses").hasRole("TEACHER")
-                        .requestMatchers(HttpMethod.POST, "/api/class-groups").hasRole("TEACHER")
                         .requestMatchers(HttpMethod.GET, "/api/teachers").hasRole("TEACHER")
                         .requestMatchers(HttpMethod.PUT, "/api/teachers/**").hasRole("TEACHER")
 
@@ -79,8 +81,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/me").authenticated()
 
                         // ── Everything else ────────────────────────────
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
+
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType("application/json");
+                            response.setStatus(403);
+                            response.getWriter().write("{\"error\": \"Access Denied\", \"message\": \"" + authException.getMessage() + "\"}");
+                        }))
 
                 // ✅ FIXED Authentication Provider
                 .authenticationProvider(authenticationProvider())

@@ -39,6 +39,7 @@ public class StudentService {
         // 1. Create User with BCrypt-encoded password
         User user = User.builder()
                 .email(email)
+                .username(email)
                 .password(passwordEncoder.encode(password))
                 .role("STUDENT")
                 .build();
