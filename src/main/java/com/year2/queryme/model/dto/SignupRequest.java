@@ -6,17 +6,20 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.Set;
+import com.year2.queryme.model.enums.UserTypes;
 
 @Getter
 @Setter
 public class SignupRequest {
     @NotBlank
-    @Size(max = 50)
     @Email
     private String email;
 
-    private Set<String> roles; // Maps to single role in DB, but keeps UI flexible
+    @NotBlank
+    @Size(min = 3, max = 50)
+    private String name;
+
+    private UserTypes role; // Strictly enforce enum usage and single role system
 
     @NotBlank
     @Size(min = 6, max = 40)

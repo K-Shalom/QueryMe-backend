@@ -52,6 +52,7 @@ public class AuthService {
         return ResponseEntity.ok(new JwtResponse(jwt,
                 userDetails.getId(),
                 userDetails.getEmail(),
+                userDetails.getName(),
                 roles));
     }
 
@@ -62,26 +63,13 @@ public class AuthService {
                     .body(new MessageResponse("Error: Email is already in use!"));
         }
 
-        UserTypes finalRole = UserTypes.STUDENT;
-        if (signUpRequest.getRoles() != null && !signUpRequest.getRoles().isEmpty()) {
-            for (String r : signUpRequest.getRoles()) {
-                switch (r.toLowerCase()) {
-                    case "admin":
-                        finalRole = UserTypes.ADMIN;
-                        break;
-                    case "teacher":
-                        finalRole = UserTypes.TEACHER;
-                        break;
-                    default:
-                        finalRole = UserTypes.STUDENT;
-                }
-            }
-        }
+        UserTypes role = (signUpRequest.getRole() != null) ? signUpRequest.getRole() : UserTypes.STUDENT;
 
         User user = User.builder()
                 .email(signUpRequest.getEmail())
+                .name(signUpRequest.getName())
                 .passwordHash(encoder.encode(signUpRequest.getPassword()))
-                .role(finalRole)
+                .role(role)
                 .createdAt(LocalDateTime.now())
                 .build();
 

@@ -17,12 +17,14 @@ public class JwtResponse {
   private String type = "Bearer";
   private UUID id;
   private String email;
+  private String name;
   private List<String> roles;
 
-  public JwtResponse(String accessToken, UUID id, String email, List<String> roles) {
+  public JwtResponse(String accessToken, UUID id, String email, String name, List<String> roles) {
     this.token = accessToken;
     this.id = id;
     this.email = email;
+    this.name = name;
     this.roles = roles;
   }
 }
