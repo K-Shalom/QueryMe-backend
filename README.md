@@ -233,110 +233,109 @@ DELETE /api/exams/{examId}
 
 # Group D — Sandbox Environment Module
 
-Welcome to the Sandbox Environment Module documentation for the QueryMe backend project. This module, developed by Group D, provides a secure and isolated database environment for students to execute SQL queries during exams. As a fellow developer in our university class project, this guide will help you understand and integrate with our internal API.
+## Overview
 
-## Overview / Architecture
+The Sandbox Environment Module provides schema-based PostgreSQL isolation for exam execution within the QueryMe monolith. It provisions a dedicated schema for each exam and student pairing, optionally applies seed data, and records sandbox metadata for lifecycle tracking.
 
-The Sandbox Environment Module is a core component of the QueryMe monolithic Spring Boot application, designed to dynamically provision, secure, and manage isolated PostgreSQL schemas for individual student exam sessions. Its primary purpose is to ensure data isolation and security by preventing students from accessing or modifying the main application data stored in the public schema.
+This module uses the shared database user `level6year2` for schema-based isolation. The shared user remains consistent across sandbox operations while isolation is achieved through dedicated PostgreSQL schemas.
 
-### Security Model
-- **Isolation**: Each student gets a unique schema (e.g., `exam_123_student_456`) and a dedicated database user with randomly generated credentials.
-- **Blast Radius Containment**: Students are explicitly revoked access to the public schema and granted full CRUD permissions only on their assigned schema.
-- **Automated Cleanup**: Expired sandboxes are automatically torn down to free up server resources and maintain a clean database state.
+## Key Features
 
-### Key Processes
-1. **Provisioning**: Upon exam start, a new schema and user are created using `JdbcTemplate` for direct SQL execution.
-2. **Security Enforcement**: SQL commands revoke public schema access and grant schema-specific privileges.
-3. **Registry Tracking**: Active sandboxes are tracked via a JPA entity for monitoring and cleanup.
-4. **Teardown**: Manual or scheduled removal of schemas and users when exams conclude or expire.
+### Validation
+Before provisioning a sandbox, the service validates that both the exam and the student exist in the system. This prevents invalid or orphaned sandbox creation and keeps the workflow aligned with the monolith’s existing records.
 
-## Key Components
+### Isolation
+Each sandbox is isolated through a unique schema derived from the exam and student identifiers. This keeps student execution separated from the rest of the application data while still operating in the shared database environment.
 
-The module consists of the following main classes:
+### 63-Character Safety
+PostgreSQL identifiers are limited to 63 characters. The sandbox module applies schema naming rules that keep generated identifiers safe, normalized, and compatible with PostgreSQL limits.
 
-- **`SandboxService`**: The primary interface for interacting with the sandbox functionality. It defines methods for provisioning, retrieving connection details, and tearing down sandboxes.
-- **`SandboxRegistry`**: A JPA entity mapped to the `sandbox_registry` table, used to persist metadata about active sandboxes, including schema names, user details, expiration times, and status.
-- **`SandboxCleanupScheduler`**: A Spring `@Scheduled` component that runs every 5 minutes to identify and clean up expired sandboxes, ensuring efficient resource management.
+## API Documentation
 
-## Configuration Requirements
+Base path: `http://localhost:8080/api/sandboxes`
 
-To enable the Sandbox Environment Module, ensure the following configurations are in place:
+### Endpoint Summary
 
-- **JPA DDL Auto-Update**: Set `spring.jpa.hibernate.ddl-auto=update` in your `application.yml` to allow Hibernate to create and update the `sandbox_registry` table automatically.
-- **Scheduling Enablement**: Add `@EnableScheduling` to your main Spring Boot application class (e.g., `QueryMeBackendApplication`) to activate the background cleanup scheduler.
-- **Database User Privileges**: The main database user (configured via `DB_USER`) must have `CREATEROLE` privileges in PostgreSQL to create and manage temporary database users for sandboxes.
+| Endpoint | Method | Purpose | Input | Success Response |
+|---|---|---|---|---|
+| `/provision` | POST | Provision or reuse a sandbox schema for an exam/student pair | JSON body with `examId`, `studentId`, optional `seedSql` | `201 Created` with `schemaName`, `dbUsername` |
+| `/{examId}/students/{studentId}` | GET | Retrieve active sandbox connection details | `examId` and `studentId` as path variables | `200 OK` with `schemaName`, `dbUsername` |
+| `/{examId}/students/{studentId}` | DELETE | Tear down sandbox schema and update registry status | `examId` and `studentId` as path variables | `200 OK` with success `message` |
 
-Example application.yml snippet:
-```yaml
-spring:
-  jpa:
-    hibernate:
-      ddl-auto: update
-```
+### How These Endpoints Work
 
-Example main application class:
-```java
-@SpringBootApplication
-@EnableScheduling
-public class QueryMeBackendApplication {
-    // ...
+| Step | Endpoint | What Happens Internally |
+|---|---|---|
+| 1 | `POST /provision` | Validates exam and student records, generates schema name, creates schema if missing, optionally executes `seedSql`, stores registry metadata, returns sandbox connection info. |
+| 2 | `GET /{examId}/students/{studentId}` | Looks up sandbox registry by exam and student, confirms sandbox status is active, then returns schema and database username. |
+| 3 | `DELETE /{examId}/students/{studentId}` | Finds the sandbox registry record, drops the schema, updates status, and returns a confirmation message. |
+
+### JSON Sample Data
+
+#### 1) Provision Sandbox
+
+Request (`POST /api/sandboxes/provision`):
+
+```json
+{
+  "examId": "7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11",
+  "studentId": "2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73",
+  "seedSql": "CREATE TABLE IF NOT EXISTS answers (id UUID PRIMARY KEY, answer_text VARCHAR(255)); INSERT INTO answers (id, answer_text) VALUES ('9d4f8a89-7c7f-4a98-9cc5-ae9e1d6c5f10', 'Sample answer');"
 }
 ```
 
-## Integration Guide for Group G
+Response (`201 Created`):
 
-As Group G (Query Engine), you can integrate with the Sandbox Environment Module by autowiring the `SandboxService` interface into your Spring `@Service` classes. This allows you to provision isolated database environments for query execution and securely manage their lifecycles.
-
-Below is a sample integration example:
-
-```java
-package com.year2.queryme.queryengine; // Replace with your actual package
-
-import com.year2.queryme.sandbox.dto.SandboxConnectionInfo;
-import com.year2.queryme.sandbox.service.SandboxService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.UUID;
-
-@Service
-public class QueryEngineService {
-
-    @Autowired
-    private SandboxService sandboxService;
-
-    public void executeStudentQuery(UUID examId, UUID studentId, String seedSql, String studentQuery) {
-        // Step 1: Provision a new sandbox for the student
-        String schemaName = sandboxService.provisionSandbox(examId, studentId, seedSql);
-        System.out.println("Provisioned sandbox with schema: " + schemaName);
-
-        // Step 2: Retrieve connection details for database access
-        SandboxConnectionInfo connectionInfo = sandboxService.getSandboxConnectionDetails(examId, studentId);
-        String dbUsername = connectionInfo.dbUsername();
-        String dbPassword = connectionInfo.dbPassword(); // Assuming password is included
-        String schema = connectionInfo.schemaName();
-
-        // Step 3: Use the connection details to execute the student's query
-        // (Implement your query execution logic here using JdbcTemplate or a DataSource)
-        // For example:
-        // DataSource dataSource = createDataSource(dbUsername, dbPassword, schema);
-        // executeQuery(dataSource, studentQuery);
-
-        // Step 4: After query execution, teardown the sandbox
-        sandboxService.teardownSandbox(examId, studentId);
-        System.out.println("Teardown completed for exam: " + examId + ", student: " + studentId);
-    }
-
-    // Additional helper methods for DataSource creation and query execution...
+```json
+{
+  "schemaName": "exam_7f8c2f5f1ad24a8fa4e281f6cb2e4d11_student_2c39c7f985f84b2a90c8d4f4b5d99f73",
+  "dbUsername": "level6year2"
 }
 ```
 
-### Method Details
-- **`provisionSandbox(UUID examId, UUID studentId, String seedSql)`**: Provisions a new sandbox and returns the schema name. The `seedSql` parameter allows initializing the schema with exam-specific data.
-- **`getSandboxConnectionDetails(UUID examId, UUID studentId)`**: Retrieves connection information (schema name, username, password) for an active sandbox.
-- **`teardownSandbox(UUID examId, UUID studentId)`**: Permanently removes the sandbox, dropping the schema and associated user.
+#### 2) Get Sandbox Connection Details
 
-Ensure that your service handles exceptions appropriately, as provisioning or teardown operations may fail due to database constraints or permissions.
+Request (`GET /api/sandboxes/7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11/students/2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73`)
 
-If you have any questions or need further assistance, feel free to reach out to Group D!
+Response (`200 OK`):
+
+```json
+{
+  "schemaName": "exam_7f8c2f5f1ad24a8fa4e281f6cb2e4d11_student_2c39c7f985f84b2a90c8d4f4b5d99f73",
+  "dbUsername": "level6year2"
+}
+```
+
+#### 3) Tear Down Sandbox
+
+Request (`DELETE /api/sandboxes/7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11/students/2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73`)
+
+Response (`200 OK`):
+
+```json
+{
+  "message": "Sandbox successfully dropped for examId=7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11 and studentId=2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73"
+}
+```
+
+### Error Samples
+
+Validation failure example (`400/500` depending on global exception mapping):
+
+```json
+{
+  "message": "Exam not found in registry"
+}
+```
+
+Authorization failure example:
+
+```json
+{
+  "path": "/api/sandboxes/provision",
+  "error": "Unauthorized",
+  "message": "Full authentication is required to access this resource",
+  "status": 401
+}
+```
 
