@@ -8,6 +8,7 @@ import com.year2.queryme.model.Question;
 import com.year2.queryme.model.User;
 import com.year2.queryme.model.dto.QuestionRequest;
 import com.year2.queryme.model.dto.QuestionResponse;
+import com.year2.queryme.model.dto.AnswerKeyDto;
 import com.year2.queryme.repository.AnswerKeyRepository;
 import com.year2.queryme.repository.ExamRepository;
 import com.year2.queryme.repository.QuestionRepository;
@@ -33,10 +34,10 @@ public class QuestionServiceImpl implements QuestionService {
     private final SandboxService sandboxService;
     private final QueryExecutor queryExecutor;
     private final ObjectMapper objectMapper;
-    private final UserRepository userRepository; // Added UserRepository
+    private final UserRepository userRepository;
 
     @Override
-    @Transactional // If the query is invalid, it rolls back and doesn't save the question
+    @Transactional
     public QuestionResponse createQuestion(UUID examId, QuestionRequest request) {
         Question question = Question.builder()
                 .examId(examId)
@@ -49,8 +50,6 @@ public class QuestionServiceImpl implements QuestionService {
                 .build();
 
         Question savedQuestion = questionRepository.save(question);
-
-        // Run query and save Answer Key inside the Sandbox
         generateAndSaveAnswerKey(savedQuestion.getId(), examId, request.getReferenceQuery());
 
         return mapToResponse(savedQuestion);
@@ -64,26 +63,33 @@ public class QuestionServiceImpl implements QuestionService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public AnswerKeyDto getAnswerKeyForQuestion(UUID questionId) {
+        AnswerKey answerKey = answerKeyRepository.findByQuestionId(questionId)
+                .orElseThrow(() -> new RuntimeException("Answer key not found for question ID: " + questionId));
+
+        return AnswerKeyDto.builder()
+                .id(answerKey.getId())
+                .questionId(answerKey.getQuestionId())
+                .expectedColumns(answerKey.getExpectedColumns())
+                .expectedRows(answerKey.getExpectedRows())
+                .build();
+    }
+
     private void generateAndSaveAnswerKey(UUID questionId, UUID examId, String referenceQuery) {
-        // 1. Fetch Exam to get the seed SQL
         Exam exam = examRepository.findById(examId.toString())
                 .orElseThrow(() -> new RuntimeException("Exam not found"));
 
-        // 2. Fetch a REAL user ID from the database so the Sandbox validation passes
         List<User> allUsers = userRepository.findAll();
         if (allUsers.isEmpty()) {
             throw new RuntimeException("No users found to provision sandbox");
         }
-        // Convert the ID to UUID safely regardless of how Group J stored it
         UUID realTeacherUserId = UUID.fromString(allUsers.get(0).getId().toString());
 
         String schemaName = null;
 
         try {
-            // 3. Provision Sandbox (Group D) using a real user ID
             schemaName = sandboxService.provisionSandbox(examId, realTeacherUserId, exam.getSeedSql());
-
-            // 4. Execute Query safely in Sandbox (Group G) - 5 second timeout
             List<Map<String, Object>> rows = queryExecutor.executeSandboxedQuery(schemaName, referenceQuery, 5);
 
             List<String> columns = new ArrayList<>();
@@ -107,7 +113,6 @@ public class QuestionServiceImpl implements QuestionService {
         } catch (Exception e) {
             throw new RuntimeException("Error executing teacher's reference query: " + e.getMessage(), e);
         } finally {
-            // 5. Always Teardown the Sandbox, even if it crashed (Group D)
             if (schemaName != null) {
                 sandboxService.teardownSandbox(examId, realTeacherUserId);
             }

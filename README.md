@@ -1,6 +1,5 @@
+
 # QueryMe Backend
-
-
 
 ---
 
@@ -17,13 +16,15 @@
 
 ### Environment Variables
 
-
+```bash
+# Optional — override default admin seeded on startup
+ADMIN_EMAIL=admin@gmail.com 
+ADMIN_PASSWORD=Admin@1234
 ```
 
 ### Run the server
 
-bash
-
+```bash
 ./mvnw spring-boot:run
 ```
 
@@ -31,14 +32,10 @@ Server starts on **`http://localhost:8080`**
 
 > On first startup, a default ADMIN account is automatically created using `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 > Change these before deploying to any shared environment.
-# Optional — override default admin seeded on startup
-ADMIN_EMAIL=admin@gmail.com 
 
-ADMIN_PASSWORD=Admin@1234
 ---
 
 # Group J — Auth Module
-
 
 Every HTTP request on the platform passes through the JWT filter maintained by this group.
 This section documents how to authenticate and how other groups should handle tokens.
@@ -69,7 +66,7 @@ CREATE TABLE users (
 
 ## Base URL
 
-```
+```text
 http://localhost:8080/api/auth
 http://localhost:8080/api/users
 ```
@@ -78,7 +75,7 @@ http://localhost:8080/api/users
 
 ### Register a new user
 
-```
+```text
 POST /api/auth/signup
 Content-Type: application/json
 ```
@@ -127,7 +124,7 @@ Request body:
 
 ### Login
 
-```
+```text
 POST /api/auth/signin
 Content-Type: application/json
 ```
@@ -161,7 +158,7 @@ Request body:
 
 Include the token in every request:
 
-```
+```text
 Authorization: Bearer <your_token_here>
 ```
 
@@ -169,7 +166,7 @@ Authorization: Bearer <your_token_here>
 
 ### Get own profile
 
-```
+```text
 GET /api/users/me
 Authorization: Bearer <token>
 ```
@@ -191,7 +188,7 @@ Available to **any authenticated role**.
 
 ### List all users *(ADMIN only)*
 
-```
+```text
 GET /api/users
 Authorization: Bearer <admin_token>
 ```
@@ -202,14 +199,14 @@ Authorization: Bearer <admin_token>
 
 ### Filter users by role *(ADMIN or TEACHER)*
 
-```
+```text
 GET /api/users/role/{role}
 Authorization: Bearer <admin_or_teacher_token>
 ```
 
 Example:
 
-```
+```text
 GET /api/users/role/STUDENT
 ```
 
@@ -219,7 +216,7 @@ GET /api/users/role/STUDENT
 
 ### Get user by ID *(ADMIN only)*
 
-```
+```text
 GET /api/users/{id}
 Authorization: Bearer <admin_token>
 ```
@@ -230,7 +227,7 @@ Authorization: Bearer <admin_token>
 
 ### Delete user *(ADMIN only)*
 
-```
+```text
 DELETE /api/users/{id}
 Authorization: Bearer <admin_token>
 ```
@@ -313,13 +310,13 @@ String role  = currentUser.getAuthorities().iterator().next().getAuthority(); //
 
 All endpoints require a valid JWT token:
 
-```
+```text
 Authorization: Bearer <token>
 ```
 
 ## Exam Status Lifecycle
 
-```
+```text
 DRAFT → PUBLISHED → CLOSED
   ↑________↓
  (unpublish)
@@ -329,7 +326,7 @@ DRAFT → PUBLISHED → CLOSED
 
 ### Create an exam
 
-```
+```text
 POST /api/exams
 ```
 
@@ -379,7 +376,7 @@ POST /api/exams
 
 ### Get exam by ID
 
-```
+```text
 GET /api/exams/{examId}
 ```
 
@@ -389,7 +386,7 @@ GET /api/exams/{examId}
 
 ### Get exams by course
 
-```
+```text
 GET /api/exams/course/{courseId}
 ```
 
@@ -399,7 +396,7 @@ GET /api/exams/course/{courseId}
 
 ### Get all published exams
 
-```
+```text
 GET /api/exams/published
 ```
 
@@ -409,7 +406,7 @@ GET /api/exams/published
 
 ### Update an exam
 
-```
+```text
 PUT /api/exams/{examId}
 ```
 
@@ -440,7 +437,7 @@ PUT /api/exams/{examId}
 
 ### Publish an exam
 
-```
+```text
 PATCH /api/exams/{examId}/publish
 ```
 
@@ -462,7 +459,7 @@ Validation before publish:
 
 ### Unpublish an exam
 
-```
+```text
 PATCH /api/exams/{examId}/unpublish
 ```
 
@@ -487,7 +484,7 @@ PATCH /api/exams/{examId}/unpublish
 
 ### Close an exam
 
-```
+```text
 PATCH /api/exams/{examId}/close
 ```
 
@@ -503,7 +500,7 @@ PATCH /api/exams/{examId}/close
 
 ### Delete an exam
 
-```
+```text
 DELETE /api/exams/{examId}
 ```
 
@@ -541,237 +538,7 @@ DELETE /api/exams/{examId}
 
 ---
 
-# Group D — Sandbox Environment Module
-
-**Overview:** This module dynamically provisions and manages isolated PostgreSQL schemas
-for individual student exam sessions. Each student gets a private schema seeded with the
-exam dataset, so queries cannot affect other students or the application database.
-
-## Architecture
-
-### Security Model
-
-- **Isolation**: Each student gets a unique schema (e.g., `exam_123_student_456`) and a dedicated database user with randomly generated credentials.
-- **Blast Radius Containment**: Students are explicitly revoked access to the `public` schema and granted full CRUD permissions only on their assigned schema.
-- **Automated Cleanup**: Expired sandboxes are automatically torn down to free up server resources.
-
-### Key Components
-
-| Class | Role |
-|---|---|
-| `SandboxService` | Primary interface — provision, retrieve connection info, teardown |
-| `SandboxRegistry` | JPA entity tracking active sandboxes in the `sandbox_registry` table |
-| `SandboxCleanupScheduler` | Runs every 5 minutes to remove expired sandboxes |
-## Overview
-
-The Sandbox Environment Module provides schema-based PostgreSQL isolation for exam execution within the QueryMe monolith. It provisions a dedicated schema for each exam and student pairing, optionally applies seed data, and records sandbox metadata for lifecycle tracking.
-
-This module uses the shared database user `level6year2` for schema-based isolation. The shared user remains consistent across sandbox operations while isolation is achieved through dedicated PostgreSQL schemas.
-
-## Key Features
-
-### Validation
-Before provisioning a sandbox, the service validates that both the exam and the student exist in the system. This prevents invalid or orphaned sandbox creation and keeps the workflow aligned with the monolith’s existing records.
-
-### Isolation
-Each sandbox is isolated through a unique schema derived from the exam and student identifiers. This keeps student execution separated from the rest of the application data while still operating in the shared database environment.
-
-### 63-Character Safety
-PostgreSQL identifiers are limited to 63 characters. The sandbox module applies schema naming rules that keep generated identifiers safe, normalized, and compatible with PostgreSQL limits.
-
-## API Documentation
-
-Base path: `http://localhost:8080/api/sandboxes`
-
-### Endpoint Summary
-
-| Endpoint | Method | Purpose | Input | Success Response |
-|---|---|---|---|---|
-| `/provision` | POST | Provision or reuse a sandbox schema for an exam/student pair | JSON body with `examId`, `studentId`, optional `seedSql` | `201 Created` with `schemaName`, `dbUsername` |
-| `/{examId}/students/{studentId}` | GET | Retrieve active sandbox connection details | `examId` and `studentId` as path variables | `200 OK` with `schemaName`, `dbUsername` |
-| `/{examId}/students/{studentId}` | DELETE | Tear down sandbox schema and update registry status | `examId` and `studentId` as path variables | `200 OK` with success `message` |
-
-### How These Endpoints Work
-
-| Step | Endpoint | What Happens Internally |
-|---|---|---|
-| 1 | `POST /provision` | Validates exam and student records, generates schema name, creates schema if missing, optionally executes `seedSql`, stores registry metadata, returns sandbox connection info. |
-| 2 | `GET /{examId}/students/{studentId}` | Looks up sandbox registry by exam and student, confirms sandbox status is active, then returns schema and database username. |
-| 3 | `DELETE /{examId}/students/{studentId}` | Finds the sandbox registry record, drops the schema, updates status, and returns a confirmation message. |
-
-### JSON Sample Data
-
-#### 1) Provision Sandbox
-
-Request (`POST /api/sandboxes/provision`):
-
-```json
-{
-  "examId": "7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11",
-  "studentId": "2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73",
-  "seedSql": "CREATE TABLE IF NOT EXISTS answers (id UUID PRIMARY KEY, answer_text VARCHAR(255)); INSERT INTO answers (id, answer_text) VALUES ('9d4f8a89-7c7f-4a98-9cc5-ae9e1d6c5f10', 'Sample answer');"
-}
-```
-
-Response (`201 Created`):
-
-```json
-{
-  "schemaName": "exam_7f8c2f5f1ad24a8fa4e281f6cb2e4d11_student_2c39c7f985f84b2a90c8d4f4b5d99f73",
-  "dbUsername": "level6year2"
-}
-```
-
-#### 2) Get Sandbox Connection Details
-
-Request (`GET /api/sandboxes/7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11/students/2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73`)
-
-Response (`200 OK`):
-
-```json
-{
-  "schemaName": "exam_7f8c2f5f1ad24a8fa4e281f6cb2e4d11_student_2c39c7f985f84b2a90c8d4f4b5d99f73",
-  "dbUsername": "level6year2"
-}
-```
-
-#### 3) Tear Down Sandbox
-
-Request (`DELETE /api/sandboxes/7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11/students/2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73`)
-
-    public void executeStudentQuery(UUID examId, UUID studentId,
-                                    String seedSql, String studentQuery) {
-        // 1. Provision sandbox
-        String schemaName = sandboxService.provisionSandbox(examId, studentId, seedSql);
-
-        // 2. Get connection details
-        SandboxConnectionInfo info = sandboxService.getSandboxConnectionDetails(examId, studentId);
-        String dbUsername = info.dbUsername();
-        String dbPassword = info.dbPassword();
-        String schema     = info.schemaName();
-
-        // 3. Execute student query using the connection details
-        // (use JdbcTemplate or a dedicated DataSource pointed at the schema)
-
-        // 4. Teardown after execution
-        sandboxService.teardownSandbox(examId, studentId);
-    }
-}
-```
-
-### Method Reference
-
-| Method | Parameters | Returns | Description |
-|---|---|---|---|
-| `provisionSandbox` | `examId`, `studentId`, `seedSql` | `String` schemaName | Creates schema, user, seeds data |
-| `getSandboxConnectionDetails` | `examId`, `studentId` | `SandboxConnectionInfo` | Returns schema + credentials |
-| `teardownSandbox` | `examId`, `studentId` | `void` | Drops schema and user permanently |
-
-> Handle exceptions for all three calls — provisioning can fail if the DB user lacks `CREATEROLE`.
-
----
-Response (`200 OK`):
-
-```json
-{
-  "message": "Sandbox successfully dropped for examId=7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11 and studentId=2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73"
-}
-```
-
-### Error Samples
-
-Validation failure example (`400/500` depending on global exception mapping):
-
-```json
-{
-  "message": "Exam not found in registry"
-}
-```
-
-Authorization failure example:
-
-```json
-{
-  "path": "/api/sandboxes/provision",
-  "error": "Unauthorized",
-  "message": "Full authentication is required to access this resource",
-  "status": 401
-}
-```
-
-*For questions about the Auth module contact `groupj.queryme@gmail.com`*
-
----
-
-# Group G — Query Engine Module
-
-**Overview:** The Query Engine is the core of the QueryMe platform. It is responsible for receiving student SQL queries, validating them for security, executing them in a timed sandbox, and grading the results against an answer key.
-
-## Technical Tasks
-
-- **Query Validation**: Regex-based blocklist filtering to prevent destructive SQL operations.
-- **Sandboxed Execution**: Hard-timeout (10s) query execution with restricted schema access.
-- **Result-Set Comparison**: Order-insensitive and type-normalized comparison of student output against teacher reference keys.
-- **Scoring**: Full marks for exact data matches, and optional **Partial Marks** (50%) for row-count matches.
-
-## Endpoints
-
-### Submit a Query
-```
-POST /api/query/submit
-Authorization: Bearer <token>
-```
-
-**Request Body:**
-```json
-{
-  "examId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "questionId": "e8aaee82-f787-4fab-93fa-6fbc1a1e8530",
-  "studentId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "query": "SELECT * FROM students"
-}
-```
-
-**Response `200 OK`:**
-```json
-{
-  "submissionId": "...",
-  "isCorrect": true,
-  "score": 10,
-  "executionError": null
-}
-```
-
----
-
-## Testing Your Implementation (Group G)
-
-Follow these steps in Postman to verify your module is "Demo-Ready":
-
-### 1. Test Security (Blocklist)
-Submit a query like `DROP TABLE students;`.
-- **Expected**: `executionError` should contain "Validation Error" and name the blocked keyword.
-
-### 2. Test Robustness (Numeric Matching)
-If the answer key has `1` but the student query returns `1.0`, our engine will still mark it as **Correct**.
-
-### 3. Test Fairness (Order-Insensitivity)
-Submit a query like `SELECT * FROM students` and ensure it matches the answer key even if the rows or columns are slightly rearranged.
-
-### 4. Test Performance (Timeout)
-Submit `SELECT pg_sleep(11);`.
-- **Expected**: `executionError` should say "Timeout Error: Query exceeded 10s execution limit."
-
-### 5. Test Partial Marks
-If a question has `partialMarks: true`, try a query that returns the correct number of rows but wrong data.
-- **Expected**: `score` should be **50%** of the question's marks.
-
----
-*For issues related to the Query Engine, contact Group G.*
-
-
-
-# #group-i--question-module
+# Group I — Question Module
 
 **Overview:** This module manages the creation and retrieval of questions for a specific exam. Its most critical responsibility is **Answer Key Generation**. When a teacher saves a question, this module automatically communicates with the Sandbox (Group D) and Query Engine (Group G) to run the teacher's reference query against the exam's seed data. It captures the resulting data and saves it as a normalized JSON `AnswerKey` for automated grading later.
 
@@ -873,5 +640,201 @@ Retrieves a list of all questions belonging to a specific exam, ordered by their
 ]
 ```
 *(Note: If a `STUDENT` calls this endpoint, the frontend should ideally hide the `referenceQuery` from the UI unless the exam settings permit showing it).*
+
+---
+
+### Integrating with the Query Engine (Group G)
+Group G will use the Question Module to fetch the correct Answer Key during student grading.
+**Internal Service Call:**
+```java
+// Inject QuestionService into your grading class
+AnswerKeyDto answerKey = questionService.getAnswerKeyForQuestion(questionId);
 ```
 
+---
+
+# Group D — Sandbox Environment Module
+
+**Overview:** This module dynamically provisions and manages isolated PostgreSQL schemas
+for individual student exam sessions. Each student gets a private schema seeded with the
+exam dataset, so queries cannot affect other students or the application database.
+
+## Architecture
+
+### Security Model
+
+- **Isolation**: Each student gets a unique schema (e.g., `exam_123_student_456`) and a dedicated database user with randomly generated credentials.
+- **Blast Radius Containment**: Students are explicitly revoked access to the `public` schema and granted full CRUD permissions only on their assigned schema.
+- **Automated Cleanup**: Expired sandboxes are automatically torn down to free up server resources.
+
+### Key Components
+
+| Class | Role |
+|---|---|
+| `SandboxService` | Primary interface — provision, retrieve connection info, teardown |
+| `SandboxRegistry` | JPA entity tracking active sandboxes in the `sandbox_registry` table |
+| `SandboxCleanupScheduler` | Runs every 5 minutes to remove expired sandboxes |
+
+## Overview
+
+The Sandbox Environment Module provides schema-based PostgreSQL isolation for exam execution within the QueryMe monolith. It provisions a dedicated schema for each exam and student pairing, optionally applies seed data, and records sandbox metadata for lifecycle tracking.
+
+This module uses the shared database user `level6year2` for schema-based isolation. The shared user remains consistent across sandbox operations while isolation is achieved through dedicated PostgreSQL schemas.
+
+## Key Features
+
+### Validation
+Before provisioning a sandbox, the service validates that both the exam and the student exist in the system. This prevents invalid or orphaned sandbox creation and keeps the workflow aligned with the monolith’s existing records.
+
+### Isolation
+Each sandbox is isolated through a unique schema derived from the exam and student identifiers. This keeps student execution separated from the rest of the application data while still operating in the shared database environment.
+
+### 63-Character Safety
+PostgreSQL identifiers are limited to 63 characters. The sandbox module applies schema naming rules that keep generated identifiers safe, normalized, and compatible with PostgreSQL limits.
+
+## API Documentation
+
+Base path: `http://localhost:8080/api/sandboxes`
+
+### Endpoint Summary
+
+| Endpoint | Method | Purpose | Input | Success Response |
+|---|---|---|---|---|
+| `/provision` | POST | Provision or reuse a sandbox schema for an exam/student pair | JSON body with `examId`, `studentId`, optional `seedSql` | `201 Created` with `schemaName`, `dbUsername` |
+| `/{examId}/students/{studentId}` | GET | Retrieve active sandbox connection details | `examId` and `studentId` as path variables | `200 OK` with `schemaName`, `dbUsername` |
+| `/{examId}/students/{studentId}` | DELETE | Tear down sandbox schema and update registry status | `examId` and `studentId` as path variables | `200 OK` with success `message` |
+
+### How These Endpoints Work
+
+| Step | Endpoint | What Happens Internally |
+|---|---|---|
+| 1 | `POST /provision` | Validates exam and student records, generates schema name, creates schema if missing, optionally executes `seedSql`, stores registry metadata, returns sandbox connection info. |
+| 2 | `GET /{examId}/students/{studentId}` | Looks up sandbox registry by exam and student, confirms sandbox status is active, then returns schema and database username. |
+| 3 | `DELETE /{examId}/students/{studentId}` | Finds the sandbox registry record, drops the schema, updates status, and returns a confirmation message. |
+
+### JSON Sample Data
+
+#### 1) Provision Sandbox
+
+Request (`POST /api/sandboxes/provision`):
+
+```json
+{
+  "examId": "7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11",
+  "studentId": "2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73",
+  "seedSql": "CREATE TABLE IF NOT EXISTS answers (id UUID PRIMARY KEY, answer_text VARCHAR(255)); INSERT INTO answers (id, answer_text) VALUES ('9d4f8a89-7c7f-4a98-9cc5-ae9e1d6c5f10', 'Sample answer');"
+}
+```
+
+Response (`201 Created`):
+
+```json
+{
+  "schemaName": "exam_7f8c2f5f1ad24a8fa4e281f6cb2e4d11_student_2c39c7f985f84b2a90c8d4f4b5d99f73",
+  "dbUsername": "level6year2"
+}
+```
+
+#### 2) Get Sandbox Connection Details
+
+Request (`GET /api/sandboxes/7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11/students/2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73`)
+
+Response (`200 OK`):
+
+```json
+{
+  "schemaName": "exam_7f8c2f5f1ad24a8fa4e281f6cb2e4d11_student_2c39c7f985f84b2a90c8d4f4b5d99f73",
+  "dbUsername": "level6year2"
+}
+```
+
+#### 3) Tear Down Sandbox
+
+Request (`DELETE /api/sandboxes/7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11/students/2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73`)
+
+Response (`200 OK`):
+
+```json
+{
+  "message": "Sandbox successfully dropped for examId=7f8c2f5f-1ad2-4a8f-a4e2-81f6cb2e4d11 and studentId=2c39c7f9-85f8-4b2a-90c8-d4f4b5d99f73"
+}
+```
+
+### Method Reference
+
+| Method | Parameters | Returns | Description |
+|---|---|---|---|
+| `provisionSandbox` | `examId`, `studentId`, `seedSql` | `String` schemaName | Creates schema, user, seeds data |
+| `getSandboxConnectionDetails` | `examId`, `studentId` | `SandboxConnectionInfo` | Returns schema + credentials |
+| `teardownSandbox` | `examId`, `studentId` | `void` | Drops schema and user permanently |
+
+> Handle exceptions for all three calls — provisioning can fail if the DB user lacks `CREATEROLE`.
+
+---
+
+# Group G — Query Engine Module
+
+**Overview:** The Query Engine is the core of the QueryMe platform. It is responsible for receiving student SQL queries, validating them for security, executing them in a timed sandbox, and grading the results against an answer key.
+
+## Technical Tasks
+
+- **Query Validation**: Regex-based blocklist filtering to prevent destructive SQL operations.
+- **Sandboxed Execution**: Hard-timeout (10s) query execution with restricted schema access.
+- **Result-Set Comparison**: Order-insensitive and type-normalized comparison of student output against teacher reference keys.
+- **Scoring**: Full marks for exact data matches, and optional **Partial Marks** (50%) for row-count matches.
+
+## Endpoints
+
+### Submit a Query
+```text
+POST /api/query/submit
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+```json
+{
+  "examId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "questionId": "e8aaee82-f787-4fab-93fa-6fbc1a1e8530",
+  "studentId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "query": "SELECT * FROM students"
+}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "submissionId": "...",
+  "isCorrect": true,
+  "score": 10,
+  "executionError": null
+}
+```
+
+---
+
+## Testing Your Implementation (Group G)
+
+Follow these steps in Postman to verify your module is "Demo-Ready":
+
+### 1. Test Security (Blocklist)
+Submit a query like `DROP TABLE students;`.
+- **Expected**: `executionError` should contain "Validation Error" and name the blocked keyword.
+
+### 2. Test Robustness (Numeric Matching)
+If the answer key has `1` but the student query returns `1.0`, our engine will still mark it as **Correct**.
+
+### 3. Test Fairness (Order-Insensitivity)
+Submit a query like `SELECT * FROM students` and ensure it matches the answer key even if the rows or columns are slightly rearranged.
+
+### 4. Test Performance (Timeout)
+Submit `SELECT pg_sleep(11);`.
+- **Expected**: `executionError` should say "Timeout Error: Query exceeded 10s execution limit."
+
+### 5. Test Partial Marks
+If a question has `partialMarks: true`, try a query that returns the correct number of rows but wrong data.
+- **Expected**: `score` should be **50%** of the question's marks.
+
+---
+*For issues related to the Query Engine, contact Group G.*
+```
