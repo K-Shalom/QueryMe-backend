@@ -1,8 +1,9 @@
 package com.year2.queryme.model;
 
-import com.year2.queryme.config.StringLongConverter;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.util.UUID;
 
 @Entity
 @Table(name = "teachers")
@@ -16,8 +17,11 @@ public class Teacher {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "full_name", nullable = false)
     private String fullName;
+
+    @Column(name = "department")
+    private String department;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id", referencedColumnName = "id")

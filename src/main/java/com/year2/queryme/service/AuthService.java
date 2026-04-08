@@ -37,6 +37,12 @@ public class AuthService {
     @Autowired
     JwtUtils jwtUtils;
 
+    @Autowired
+    StudentService studentService;
+
+    @Autowired
+    TeacherService teacherService;
+
     public ResponseEntity<?> authenticateUser(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
@@ -65,15 +71,32 @@ public class AuthService {
 
         UserTypes role = (signUpRequest.getRole() != null) ? signUpRequest.getRole() : UserTypes.STUDENT;
 
-        User user = User.builder()
-                .email(signUpRequest.getEmail())
-                .name(signUpRequest.getName())
-                .passwordHash(encoder.encode(signUpRequest.getPassword()))
-                .role(role)
-                .createdAt(LocalDateTime.now())
-                .build();
-
-        userRepository.save(user);
+        if (role == UserTypes.STUDENT) {
+            studentService.registerStudent(
+                signUpRequest.getEmail(),
+                signUpRequest.getPassword(),
+                signUpRequest.getFullName() != null ? signUpRequest.getFullName() : signUpRequest.getName(),
+                null, null,
+                signUpRequest.getStudentNumber()
+            );
+        } else if (role == UserTypes.TEACHER) {
+            teacherService.registerTeacher(
+                signUpRequest.getEmail(),
+                signUpRequest.getPassword(),
+                signUpRequest.getFullName() != null ? signUpRequest.getFullName() : signUpRequest.getName(),
+                signUpRequest.getDepartment()
+            );
+        } else {
+            // Admin or other
+            User user = User.builder()
+                    .email(signUpRequest.getEmail())
+                    .name(signUpRequest.getFullName() != null ? signUpRequest.getFullName() : signUpRequest.getName())
+                    .passwordHash(encoder.encode(signUpRequest.getPassword()))
+                    .role(role)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            userRepository.save(user);
+        }
 
         return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
     }

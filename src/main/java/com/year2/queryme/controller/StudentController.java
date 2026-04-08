@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/students")
@@ -26,8 +27,8 @@ public class StudentController {
                 data.get("password"),
                 data.get("fullName"),
                 data.containsKey("courseId") ? Long.parseLong(data.get("courseId")) : null,
-                data.containsKey("classGroupId") ? Long.parseLong(data.get("classGroupId")) : null
-        );
+                data.containsKey("classGroupId") ? Long.parseLong(data.get("classGroupId")) : null,
+                data.get("student_number"));
     }
 
     @PutMapping("/{id}")

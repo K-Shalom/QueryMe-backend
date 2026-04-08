@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/teachers")
@@ -24,7 +25,8 @@ public class TeacherController {
         return teacherService.registerTeacher(
                 data.get("email"),
                 data.get("password"),
-                data.get("fullName")
+                data.get("fullName"),
+                data.get("department")
         );
     }
 

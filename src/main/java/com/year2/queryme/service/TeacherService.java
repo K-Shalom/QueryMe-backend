@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class TeacherService {
@@ -25,7 +26,7 @@ public class TeacherService {
     private PasswordEncoder passwordEncoder;
 
     @Transactional
-    public Teacher registerTeacher(String email, String password, String fullName) {
+    public Teacher registerTeacher(String email, String password, String fullName, String department) {
         // 1. Create User with BCrypt-encoded password
         User user = User.builder()
                 .email(email)
@@ -38,6 +39,7 @@ public class TeacherService {
         // 2. Create Teacher linked to User
         Teacher teacher = Teacher.builder()
                 .fullName(fullName)
+                .department(department)
                 .user(user)
                 .build();
 
@@ -56,6 +58,9 @@ public class TeacherService {
                 user.setName(data.get("fullName"));
                 userRepository.save(user);
             }
+        }
+        if (data.containsKey("department")) {
+            teacher.setDepartment(data.get("department"));
         }
         if (data.containsKey("password")) {
             User user = teacher.getUser();
