@@ -1,44 +1,55 @@
 package com.year2.queryme.service;
 
+import com.year2.queryme.model.Exam;
+import com.year2.queryme.model.ExamSession;
+import com.year2.queryme.model.Question;
 import com.year2.queryme.model.Result;
+import com.year2.queryme.model.Submission;
+import com.year2.queryme.model.enums.ExamStatus;
+import com.year2.queryme.model.enums.VisibilityMode;
+import com.year2.queryme.repository.ExamRepository;
+import com.year2.queryme.repository.ExamSessionRepository;
+import com.year2.queryme.repository.QuestionRepository;
 import com.year2.queryme.repository.ResultRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.year2.queryme.repository.SubmissionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class ResultServiceImpl implements ResultService {
 
-    @Autowired
-    private ResultRepository resultRepository;
+    private final ResultRepository resultRepository;
+    private final ExamSessionRepository examSessionRepository;
+    private final ExamRepository examRepository;
+    private final SubmissionRepository submissionRepository;
+    private final QuestionRepository questionRepository;
 
-    // TODO: GROUP A (Exam Module) - Inject ExamService here
-    // You need this to check visibility_mode and exam end times.
+    /**
+     * Applies the exam's current visibility mode before exposing session results.
+     */
 
     @Override
     public List<Result> getResultsForStudent(UUID sessionId) {
-        /* * LOGIC FROM GROUP A (Exam):
-         * 1. Call examService.getSessionById(sessionId) to get the exam_id.
-         * 2. Call examService.getExamSettings(examId) to retrieve 'visibility_mode'.
-         */
+        ExamSession session = examSessionRepository.findById(sessionId.toString())
+                .orElseThrow(() -> new RuntimeException("Session not found: " + sessionId));
 
-        // Mocking the check for now:
-        String visibilityMode = "END_OF_EXAM"; // This should come from Group A [cite: 61]
-        LocalDateTime expiresAt = LocalDateTime.now().plusHours(1); // This should come from Group A [cite: 60]
+        Exam exam = examRepository.findById(session.getExamId())
+                .orElseThrow(() -> new RuntimeException("Exam not found: " + session.getExamId()));
 
-        // Visibility Gatekeeping Logic:
-        if ("NEVER".equalsIgnoreCase(visibilityMode)) {
-            return Collections.emptyList();
+        if (exam.getVisibilityMode() == VisibilityMode.NEVER) {
+            return List.of();
         }
 
-        if ("END_OF_EXAM".equalsIgnoreCase(visibilityMode)) {
-            // Logic Check: Is the exam still active?
-            if (LocalDateTime.now().isBefore(expiresAt)) {
-                return Collections.emptyList(); // Block access until timer expires [cite: 30, 62]
-            }
+        if (exam.getVisibilityMode() == VisibilityMode.END_OF_EXAM
+                && exam.getStatus() != ExamStatus.CLOSED) {
+            return List.of();
         }
 
         return resultRepository.findBySessionId(sessionId);
@@ -46,36 +57,48 @@ public class ResultServiceImpl implements ResultService {
 
     @Override
     public void processNewSubmission(UUID submissionId) {
-        /* * LOGIC FROM GROUP G (Query Engine):
-         * 1. Call queryService.getSubmissionById(submissionId).
-         * 2. Group G provides the 'mark', 'max_mark', and 'is_correct' status
-         * calculated by their result-set comparator[cite: 45, 61].
-         */
+        try {
+            Submission submission = submissionRepository.findById(submissionId)
+                    .orElseThrow(() -> new RuntimeException("Submission not found: " + submissionId));
 
-        // Once data is received from Group G, map it to your 'results' table:
-        Result result = new Result();
-        result.setSubmissionId(submissionId);
-        result.setGradedAt(LocalDateTime.now());
-
-        // These values are the output of Group G's grading logic[cite: 61]:
-        // result.setScore(submission.getMark());
-        // result.setIsCorrect(submission.getIsCorrect());
-
-        resultRepository.save(result);
+            saveQueryResult(submissionId, submission.getScore(), submission.getIsCorrect());
+        } catch (RuntimeException ex) {
+            log.warn("Could not synchronize submission {} into results yet: {}", submissionId, ex.getMessage());
+        }
     }
 
     @Override
     public List<Result> getResultsForTeacher(UUID examId) {
-        /* * LOGIC FROM GROUP F (User/Student):
-         * When returning this list to the Teacher Dashboard (Group H),
-         * you may need to call userService.getStudentDetails() to show
-         * real names instead of just UUIDs[cite: 61].
-         */
         return resultRepository.findAllByExamId(examId);
     }
 
     @Override
     public Result saveQueryResult(UUID submissionId, Integer score, Boolean isCorrect) {
-        return null;
+        Submission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new RuntimeException("Submission not found: " + submissionId));
+
+        ExamSession session = examSessionRepository.findByExamIdAndStudentId(
+                        submission.getExamId().toString(),
+                        submission.getStudentId().toString())
+                .orElseThrow(() -> new RuntimeException(
+                        "Session not found for exam %s and student %s"
+                                .formatted(submission.getExamId(), submission.getStudentId())));
+
+        Question question = questionRepository.findById(submission.getQuestionId())
+                .orElseThrow(() -> new RuntimeException("Question not found: " + submission.getQuestionId()));
+
+        Result result = resultRepository.findBySubmissionId(submissionId)
+                .orElseGet(Result::new);
+
+        result.setSubmissionId(submissionId);
+        result.setQuestionId(submission.getQuestionId());
+        result.setSessionId(UUID.fromString(session.getId()));
+        result.setExamId(submission.getExamId());
+        result.setScore(score);
+        result.setMaxScore(question.getMarks());
+        result.setIsCorrect(Boolean.TRUE.equals(isCorrect));
+        result.setGradedAt(LocalDateTime.now());
+
+        return resultRepository.save(result);
     }
 }

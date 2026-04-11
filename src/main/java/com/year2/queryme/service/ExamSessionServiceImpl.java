@@ -7,10 +7,14 @@ import com.year2.queryme.model.enums.ExamStatus;
 import com.year2.queryme.model.mapper.ExamSessionMapper;
 import com.year2.queryme.repository.ExamRepository;
 import com.year2.queryme.repository.ExamSessionRepository;
+import com.year2.queryme.sandbox.service.SandboxService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -19,8 +23,10 @@ public class ExamSessionServiceImpl implements ExamSessionService {
 
     private final ExamSessionRepository sessionRepository;
     private final ExamRepository examRepository;
+    private final SandboxService sandboxService;
 
     @Override
+    @Transactional
     public ExamSessionResponse startSession(StartSessionRequest request) {
 
         // Rule 1 — exam must exist and be PUBLISHED
@@ -43,9 +49,10 @@ public class ExamSessionServiceImpl implements ExamSessionService {
                 ? now.plusMinutes(exam.getTimeLimitMins())
                 : null;
 
-        // Build sandbox schema name: exam_{examId}_student_{studentId}
-        String sandboxSchema = "exam_" + request.getExamId().replace("-", "").substring(0, 8)
-                + "_student_" + request.getStudentId().replace("-", "").substring(0, 8);
+        String sandboxSchema = sandboxService.provisionSandbox(
+                UUID.fromString(request.getExamId()),
+                UUID.fromString(request.getStudentId()),
+                exam.getSeedSql());
 
         ExamSession session = ExamSession.builder()
                 .examId(request.getExamId())
@@ -59,6 +66,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
     }
 
     @Override
+    @Transactional
     public ExamSessionResponse submitSession(String sessionId) {
         ExamSession session = findById(sessionId);
 
@@ -74,7 +82,11 @@ public class ExamSessionServiceImpl implements ExamSessionService {
         }
 
         session.setSubmittedAt(LocalDateTime.now());
-        return ExamSessionMapper.toResponse(sessionRepository.save(session));
+        ExamSession savedSession = sessionRepository.save(session);
+        sandboxService.teardownSandbox(
+                UUID.fromString(savedSession.getExamId()),
+                UUID.fromString(savedSession.getStudentId()));
+        return ExamSessionMapper.toResponse(savedSession);
     }
 
     @Override
@@ -99,5 +111,4 @@ public class ExamSessionServiceImpl implements ExamSessionService {
                 .orElseThrow(() -> new RuntimeException("Session not found: " + sessionId));
     }
 }
-
 

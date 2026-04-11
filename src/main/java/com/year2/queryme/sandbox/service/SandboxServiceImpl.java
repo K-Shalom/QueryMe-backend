@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Slf4j
@@ -57,7 +58,7 @@ public class SandboxServiceImpl implements SandboxService {
             return existingRegistry.getSchemaName();
         }
 
-        examRepository.findById(examId.toString())
+        var exam = examRepository.findById(examId.toString())
                 .orElseThrow(() -> new SandboxProvisioningException("Exam not found in registry"));
 
         userRepository.findById(studentId)
@@ -96,6 +97,9 @@ public class SandboxServiceImpl implements SandboxService {
             registry.setSchemaName(schemaName);
             registry.setDbUser(dbUsername);
             registry.setStatus("ACTIVE");
+            registry.setExpiresAt(exam.getTimeLimitMins() != null
+                    ? LocalDateTime.now().plusMinutes(exam.getTimeLimitMins())
+                    : null);
             registryRepo.save(registry);
 
             return schemaName;

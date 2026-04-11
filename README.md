@@ -57,7 +57,7 @@ Authorization: Bearer <jwt>
 Important current-code notes:
 
 - The old `/api/users/**` endpoints documented previously are not implemented in the current project.
-- `@PreAuthorize` appears on `QuestionController` and `ResultController`, but no `@EnableMethodSecurity` was found in the scanned config. Effective access therefore comes from `SecurityConfig` first.
+- Method-level security is enabled, so `@PreAuthorize` rules on controllers are active.
 
 ## Group J - Auth
 
@@ -242,7 +242,8 @@ Base path: `/api/sandboxes`
 
 Important implementation note:
 
-- `ExamSessionServiceImpl` currently computes and stores a `sandboxSchema` name, but it does not call `SandboxService`. Actual provisioning and teardown still happen through the separate `/api/sandboxes/**` API.
+- Starting a session now provisions the student's sandbox automatically and stores the real schema name returned by `SandboxService`.
+- Submitting a session tears the sandbox down automatically. The `/api/sandboxes/**` endpoints are still available for direct lifecycle management when needed.
 
 ## Group G - Query Engine
 
@@ -259,6 +260,7 @@ What happens during grading:
 3. SQL is executed with a hard 10-second timeout.
 4. The result set is normalized and compared to the stored answer key.
 5. The submission is saved with `isCorrect`, `score`, and optional `executionError`.
+6. A `Result` record is created or refreshed for that submission so the results module can expose it immediately.
 
 Scoring behavior in the current service:
 
@@ -274,3 +276,18 @@ Base path: `/api/results`
 |---|---|---|---|
 | `GET` | `/api/results/session/{sessionId}` | Returns session results visible to a student. | Any authenticated user in current config |
 | `GET` | `/api/results/exam/{examId}/dashboard` | Returns teacher dashboard results for an exam. | Authenticated; controller also declares `TEACHER` intent with `@PreAuthorize` |
+
+Current behavior:
+
+- Student result visibility is now driven by the real `Exam.visibilityMode`.
+- `IMMEDIATE` shows results as soon as submissions are graded.
+- `END_OF_EXAM` hides results until the exam is moved to `CLOSED`.
+- `NEVER` returns no student-visible results.
+- Query submissions now flow into the `results` table automatically through `processNewSubmission(...)`.
+
+## Runtime Notes
+
+- The app runs on `http://localhost:8084`.
+- Method-level security is enabled through `@EnableMethodSecurity`.
+- Sandbox cleanup scheduling is enabled through `@EnableScheduling`.
+- The older `/api/users/**` and `/api/users/me` docs were removed because those controllers do not exist in the current project.

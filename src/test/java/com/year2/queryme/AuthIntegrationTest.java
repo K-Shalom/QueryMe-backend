@@ -46,6 +46,7 @@ public class AuthIntegrationTest {
         SignupRequest signupRequest = new SignupRequest();
         signupRequest.setEmail("test@example.com");
         signupRequest.setName("Test User");
+        signupRequest.setFullName("Test User");
         signupRequest.setPassword("password123");
         signupRequest.setRole(com.year2.queryme.model.enums.UserTypes.STUDENT);
 

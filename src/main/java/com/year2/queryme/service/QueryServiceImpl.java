@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -30,8 +31,10 @@ public class QueryServiceImpl implements QueryService {
     private final SubmissionRepository submissionRepository;
     private final AnswerKeyRepository answerKeyRepository;
     private final QuestionRepository questionRepository;
+    private final ResultService resultService;
 
     @Override
+    @Transactional
     public SubmissionResponse submitQuery(SubmissionRequest request) {
         log.info("Processing submission for student {} question {}", request.getStudentId(), request.getQuestionId());
         
@@ -94,6 +97,7 @@ public class QueryServiceImpl implements QueryService {
 
         // 5. Save the Submission
         Submission submission = submissionRepository.save(submissionBuilder.build());
+        resultService.processNewSubmission(submission.getId());
 
         return SubmissionResponse.builder()
             .submissionId(submission.getId())
