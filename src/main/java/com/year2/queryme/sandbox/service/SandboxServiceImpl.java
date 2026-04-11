@@ -10,9 +10,11 @@ import com.year2.queryme.sandbox.exception.SandboxExpiredException;
 import com.year2.queryme.sandbox.exception.SandboxNotFoundException;
 import com.year2.queryme.sandbox.exception.SandboxProvisioningException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
@@ -35,8 +37,8 @@ public class SandboxServiceImpl implements SandboxService {
             ExamRepository examRepository,
             UserRepository userRepository,
             StudentRepository studentRepository,
-            JdbcTemplate jdbcTemplate,
-            @Value("${spring.datasource.username}") String dbUsername
+            @Qualifier("sandboxJdbcTemplate") JdbcTemplate jdbcTemplate,
+            @Value("${queryme.sandbox-datasource.username:${spring.datasource.username}}") String dbUsername
     ) {
         this.registryRepo = registryRepo;
         this.examRepository = examRepository;
@@ -66,16 +68,14 @@ public class SandboxServiceImpl implements SandboxService {
 
         String studentNumber = studentRepository.findByUser_Id(studentId)
                 .map(student -> student.getStudentNumber())
-                .orElseThrow(() -> new SandboxProvisioningException("Student profile is missing"));
+                .filter(number -> number != null && !number.isBlank())
+                .orElse("u" + studentId.toString().replace("-", "").substring(0, 8));
 
         String safeStudentNumber = studentNumber.replaceAll("[^a-zA-Z0-9]", "");
 
-        Long sequenceNumber = jdbcTemplate.queryForObject("SELECT nextval('sandbox_schema_seq')", Long.class);
-        if (sequenceNumber == null) {
-            throw new SandboxProvisioningException("Failed to generate sandbox schema sequence number");
-        }
-
-        String schemaName = "s_" + safeStudentNumber + "_" + sequenceNumber;
+        String schemaName = "exam_%s_student_%s".formatted(
+                examId.toString().replace("-", "").substring(0, 8),
+                safeStudentNumber);
 
         log.info("Provisioning sandbox schema: {}", schemaName);
 
@@ -112,7 +112,7 @@ public class SandboxServiceImpl implements SandboxService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void teardownSandbox(UUID examId, UUID studentId) {
         SandboxRegistry registry = registryRepo.findByExamIdAndStudentId(examId, studentId)
                 .orElseThrow(() -> new SandboxNotFoundException("Sandbox not found for given Exam and Student"));

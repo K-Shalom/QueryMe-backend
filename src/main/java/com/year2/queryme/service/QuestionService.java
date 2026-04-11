@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public interface QuestionService {
     QuestionResponse createQuestion(UUID examId, QuestionRequest request);
+    QuestionResponse updateQuestion(UUID examId, UUID questionId, QuestionRequest request);
     List<QuestionResponse> getQuestionsForExam(UUID examId);
     AnswerKeyDto getAnswerKeyForQuestion(UUID questionId);
 }

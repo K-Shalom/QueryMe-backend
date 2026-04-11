@@ -1,14 +1,21 @@
 package com.year2.queryme.service;
 
 import com.year2.queryme.model.Exam;
+import com.year2.queryme.model.Student;
 import com.year2.queryme.model.dto.*;
 import com.year2.queryme.model.enums.ExamStatus;
+import com.year2.queryme.model.enums.UserTypes;
 import com.year2.queryme.model.mapper.ExamMapper;
+import com.year2.queryme.repository.CourseEnrollmentRepository;
 import com.year2.queryme.repository.ExamRepository;
+import com.year2.queryme.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -16,6 +23,9 @@ import java.util.stream.Collectors;
 public class ExamServiceImpl implements ExamService {
 
     private final ExamRepository examRepository;
+    private final CurrentUserService currentUserService;
+    private final StudentRepository studentRepository;
+    private final CourseEnrollmentRepository courseEnrollmentRepository;
 
     @Override
     public ExamResponse createExam(CreateExamRequest request) {
@@ -36,24 +46,35 @@ public class ExamServiceImpl implements ExamService {
                 .seedSql(request.getSeedSql())
                 .build();
 
-        return ExamMapper.toResponse(examRepository.save(exam));
+        return toResponse(examRepository.save(exam));
     }
 
     @Override
     public ExamResponse getExamById(String examId) {
-        return ExamMapper.toResponse(findById(examId));
+        Exam exam = findById(examId);
+        assertCurrentUserCanAccessExam(exam);
+        return toResponse(exam);
     }
 
     @Override
     public List<ExamResponse> getExamsByCourse(String courseId) {
-        return examRepository.findByCourseId(courseId)
-                .stream().map(ExamMapper::toResponse).collect(Collectors.toList());
+        List<Exam> exams = currentUserService.hasRole(UserTypes.STUDENT)
+                ? examRepository.findByCourseIdAndStatus(courseId, ExamStatus.PUBLISHED)
+                : examRepository.findByCourseId(courseId);
+
+        return exams.stream()
+                .filter(this::canCurrentUserAccessExam)
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
     public List<ExamResponse> getPublishedExams() {
         return examRepository.findByStatus(ExamStatus.PUBLISHED)
-                .stream().map(ExamMapper::toResponse).collect(Collectors.toList());
+                .stream()
+                .filter(this::canCurrentUserAccessExam)
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -71,7 +92,7 @@ public class ExamServiceImpl implements ExamService {
         if (request.getMaxAttempts() != null) exam.setMaxAttempts(request.getMaxAttempts());
         if (request.getSeedSql() != null) exam.setSeedSql(request.getSeedSql());
 
-        return ExamMapper.toResponse(examRepository.save(exam));
+        return toResponse(examRepository.save(exam));
     }
 
     @Override
@@ -91,7 +112,7 @@ public class ExamServiceImpl implements ExamService {
         exam.setStatus(ExamStatus.PUBLISHED);
         exam.setPublishedAt(LocalDateTime.now());
 
-        return ExamMapper.toResponse(examRepository.save(exam));
+        return toResponse(examRepository.save(exam));
     }
 
     @Override
@@ -105,7 +126,7 @@ public class ExamServiceImpl implements ExamService {
         exam.setStatus(ExamStatus.DRAFT);
         exam.setPublishedAt(null);
 
-        return ExamMapper.toResponse(examRepository.save(exam));
+        return toResponse(examRepository.save(exam));
     }
 
     @Override
@@ -117,7 +138,7 @@ public class ExamServiceImpl implements ExamService {
         }
 
         exam.setStatus(ExamStatus.CLOSED);
-        return ExamMapper.toResponse(examRepository.save(exam));
+        return toResponse(examRepository.save(exam));
     }
 
     @Override
@@ -134,5 +155,43 @@ public class ExamServiceImpl implements ExamService {
     private Exam findById(String examId) {
         return examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found: " + examId));
+    }
+
+    private ExamResponse toResponse(Exam exam) {
+        ExamResponse response = ExamMapper.toResponse(exam);
+        if (currentUserService.hasRole(UserTypes.STUDENT)) {
+            response.setSeedSql(null);
+        }
+        return response;
+    }
+
+    private void assertCurrentUserCanAccessExam(Exam exam) {
+        if (!canCurrentUserAccessExam(exam)) {
+            throw new RuntimeException("Access denied to exam: " + exam.getId());
+        }
+    }
+
+    private boolean canCurrentUserAccessExam(Exam exam) {
+        if (!currentUserService.hasRole(UserTypes.STUDENT)) {
+            return true;
+        }
+
+        if (exam.getStatus() != ExamStatus.PUBLISHED) {
+            return false;
+        }
+
+        Student student = studentRepository.findByUser_Id(currentUserService.requireCurrentUserId())
+                .orElseThrow(() -> new RuntimeException("Student profile not found"));
+
+        if (student.getCourse() != null && Objects.equals(student.getCourse().getId().toString(), exam.getCourseId())) {
+            return true;
+        }
+
+        Set<String> enrolledCourseIds = courseEnrollmentRepository.findByStudentId(student.getId())
+                .stream()
+                .map(enrollment -> enrollment.getCourse().getId().toString())
+                .collect(Collectors.toSet());
+
+        return enrolledCourseIds.contains(exam.getCourseId());
     }
 }

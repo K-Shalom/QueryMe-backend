@@ -19,9 +19,14 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 server:
-  port: 8084
+  port: ${APP_PORT:8085}
 
 queryme:
+  sandbox-datasource:
+    url: ${SANDBOX_DB_URL:${spring.datasource.url}}
+    username: ${SANDBOX_DB_USER:${spring.datasource.username}}
+    password: ${SANDBOX_DB_PASSWORD:${spring.datasource.password}}
+    driver-class-name: ${SANDBOX_DB_DRIVER:${spring.datasource.driver-class-name}}
   app:
     jwtSecret: ${JWT_SECRET:QueryMeApplicationSecretKeyMustBeLongEnoughForHMACSHA256SignatureAlgorithm}
     jwtExpirationMs: ${JWT_EXPIRATION:86400000}

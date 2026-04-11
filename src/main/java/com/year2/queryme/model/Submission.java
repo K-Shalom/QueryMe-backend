@@ -3,6 +3,8 @@ package com.year2.queryme.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -28,6 +30,9 @@ public class Submission {
     @Column(name = "question_id", nullable = false)
     private UUID questionId;
 
+    @Column(name = "session_id", nullable = false)
+    private UUID sessionId;
+
     @Column(name = "submitted_query", nullable = false, columnDefinition = "TEXT")
     private String submittedQuery;
 
@@ -39,6 +44,14 @@ public class Submission {
     
     @Column(name = "execution_error", columnDefinition = "TEXT")
     private String executionError;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "result_columns", columnDefinition = "jsonb")
+    private String resultColumns;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "result_rows", columnDefinition = "jsonb")
+    private String resultRows;
 
     @CreationTimestamp
     @Column(name = "submitted_at", updatable = false)

@@ -30,8 +30,10 @@ public class SandboxController {
     public ResponseEntity<SandboxConnectionInfo> provisionSandbox(@RequestBody SandboxProvisionRequest request) {
         log.info("Provision request received for examId={} studentId={}", request.examId(), request.studentId());
 
-        String schemaName = sandboxService.provisionSandbox(request.examId(), request.studentId(), request.seedSql());
-        SandboxConnectionInfo connectionInfo = new SandboxConnectionInfo(schemaName, "level6year2");
+        sandboxService.provisionSandbox(request.examId(), request.studentId(), request.seedSql());
+        SandboxConnectionInfo connectionInfo = sandboxService.getSandboxConnectionDetails(
+                request.examId(),
+                request.studentId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(connectionInfo);
     }
@@ -57,4 +59,3 @@ public class SandboxController {
                 .formatted(examId, studentId)));
     }
 }
-

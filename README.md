@@ -1,8 +1,26 @@
 # QueryMe Backend
 
-Spring Boot backend for the QueryMe SQL exam platform.
+Spring Boot backend for QueryMe, a web-based SQL exam platform for database courses.
 
-This README is a codebase-driven API map: the endpoints below were skimmed from the current controllers and grouped by the team/module responsible.
+The backend is organized as a modular monolith around the intended project flow:
+
+- teachers create exams and questions
+- each student attempt gets a private PostgreSQL schema
+- student SQL is graded by result-set comparison, not query-string matching
+- results are exposed according to the exam visibility mode
+
+This README is backend-focused and grouped by the team/module ownership described in the project brief.
+
+## Architecture Summary
+
+- Backend: Spring Boot modular monolith
+- Auth: Spring Security + JWT
+- App data source: `spring.datasource`
+- Sandbox data source: `queryme.sandbox-datasource.*`
+- Roles in code: `TEACHER`, `STUDENT`, `ADMIN`, `GUEST`
+- Server port: `8084`
+
+The sandbox connection now supports a separate PostgreSQL database, which matches the intended `queryme_app` / `queryme_sandbox` split. For local development, the sandbox data source falls back to the main data source if sandbox-specific environment variables are not set.
 
 ## Run Locally
 
@@ -12,52 +30,76 @@ Start the app with:
 ./mvnw spring-boot:run
 ```
 
-Current server settings from `application.yml`:
+Current config comes from `src/main/resources/application.yml` plus the optional `.env` file.
 
-- Base URL: `http://localhost:8084`
-- Config source: `.env` is loaded with `spring.config.import`
-- Required env vars: `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- Optional env vars: `JWT_SECRET`, `JWT_EXPIRATION`
+Required environment variables:
 
-Sandbox prerequisite:
+- `DB_HOST`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
 
-```sql
-CREATE SEQUENCE IF NOT EXISTS sandbox_schema_seq START 1;
-```
+Optional auth environment variables:
+
+- `JWT_SECRET`
+- `JWT_EXPIRATION`
+
+Optional sandbox database environment variables:
+
+- `SANDBOX_DB_URL`
+- `SANDBOX_DB_USER`
+- `SANDBOX_DB_PASSWORD`
+- `SANDBOX_DB_DRIVER`
+
+## Alignment Highlights
+
+These backend changes now match the intended QueryMe flow more closely:
+
+- students only see published exams assigned to them by course or enrollment
+- student-facing exam responses no longer expose `seedSql`
+- student-facing question responses no longer expose `referenceQuery`
+- question create and update both regenerate the answer key immediately
+- sessions now enforce `maxAttempts`
+- starting a session provisions the sandbox automatically
+- session expiry is auto-submitted on a scheduler and tears the sandbox down
+- query submissions are tied to a session, not just an exam/student pair
+- query submit responses only include marks/result sets when the exam visibility mode allows it
+- student result views are built from the latest submission per question for that session
+- manual sandbox provisioning now returns the real configured connection info instead of a hard-coded DB user
 
 ## Group Ownership Map
 
-| Group | Module | What they do |
+| Group | Module | Responsibility |
 |---|---|---|
-| Group J | Auth | Handles login, registration, JWT tokens, and access control. Every request flows through their security filter. |
-| Group F | User and student management | Manages student and teacher profiles, course grouping, and teacher-driven student registration. Credentials still live in the shared `users` auth model. |
-| Group A | Exam module | Lets teachers configure exams: title, description, timers, visibility, attempt limits, publishing, and closing. |
-| Group I | Question module | Manages questions inside an exam and generates the answer key immediately from the teacher's reference query. |
-| Group D | Sandbox module | Owns private PostgreSQL schemas used during exam attempts and the APIs that provision, inspect, and tear them down. |
-| Group G | Query engine | Validates student SQL, runs it inside the sandbox with a timeout, compares results to the answer key, and scores the submission. |
-| Group C | Results module | Aggregates scores and applies visibility rules to decide what students and teachers can see. |
+| Group J | Auth | Authentication, JWT generation/validation, and route security |
+| Group F | User and student management | Student/teacher identity, courses, class groups, and enrollment |
+| Group A | Exam module | Exam lifecycle, settings, publishing, attempt limits, and visibility |
+| Group I | Question module | Question CRUD and answer-key generation from the teacher reference query |
+| Group D | Sandbox module | Session lifecycle, sandbox schema creation, seeding, teardown, and cleanup |
+| Group G | Query engine | SQL validation, execution, result comparison, and submission scoring |
+| Group C | Results module | Student-visible results and teacher dashboard aggregation |
 
 ## Security Snapshot
 
 - JWT auth is enforced by `JwtAuthFilter`.
-- Public endpoints in the current `SecurityConfig` are:
+- Method security is enabled through `@EnableMethodSecurity`.
+- Scheduling is enabled through `@EnableScheduling`.
+- Public endpoints in the current config are:
   - `POST /api/auth/**`
   - `POST /api/teachers/register`
   - `POST /api/admins/register`
   - `POST /api/guests/register`
   - `GET /api/courses`
   - `GET /api/class-groups/**`
-- Everything else requires authentication unless stated otherwise below.
-- `Authorization` header format:
+- Teacher/admin writes are enforced for exam mutation and course enrollment endpoints.
+- Students can start and submit their own sessions, but exam-wide session listings are teacher/admin only.
+- Manual sandbox endpoints are teacher/admin only.
+
+Authorization header format:
 
 ```text
 Authorization: Bearer <jwt>
 ```
-
-Important current-code notes:
-
-- The old `/api/users/**` endpoints documented previously are not implemented in the current project.
-- Method-level security is enabled, so `@PreAuthorize` rules on controllers are active.
 
 ## Group J - Auth
 
@@ -65,57 +107,60 @@ Base path: `/api/auth`
 
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `POST` | `/api/auth/signup` | Registers a user. Body supports `email`, `password`, `fullName`, `role`, plus optional `student_number` and `department`. Defaults to `STUDENT` if `role` is omitted. | Public |
-| `POST` | `/api/auth/signin` | Authenticates with `email` and `password`, then returns JWT payload: `token`, `type`, `id`, `email`, `name`, `roles`. | Public |
+| `POST` | `/api/auth/signup` | Registers a user with shared auth credentials. Supports `email`, `password`, `fullName`, `role`, plus optional student fields. | Public |
+| `POST` | `/api/auth/signin` | Authenticates a user and returns the JWT payload. | Public |
 
 Notes:
 
-- `signup` creates auth credentials in the shared `users` table.
-- For `STUDENT` and `TEACHER`, signup also delegates to the profile services so the matching student/teacher record is created.
+- Signup creates credentials in the shared `users` auth table.
+- For `STUDENT` and `TEACHER`, signup also creates the matching profile record used by the other modules.
 
 ## Group F - User and Student Management
 
-These endpoints own profile records, course structure, and enrollment relationships.
+These endpoints own profile records, course structure, and teacher-driven student assignment.
 
 ### Student and Teacher Profiles
 
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `POST` | `/api/teachers/register` | Creates a teacher profile. Body: `email`, `password`, `fullName`, `department`. | Public |
-| `PUT` | `/api/teachers/{id}` | Updates teacher profile fields such as `fullName`, `department`, and `password`. | `TEACHER` |
-| `GET` | `/api/teachers` | Lists all teachers. | `TEACHER` |
-| `POST` | `/api/students/register` | Creates a student profile. Body: `email`, `password`, `fullName`, optional `courseId`, `classGroupId`, `student_number`. | `TEACHER` or `ADMIN` |
-| `PUT` | `/api/students/{id}` | Updates student fields such as `fullName`, `student_number`, `password`, `courseId`, and `classGroupId`. | `STUDENT`, `TEACHER`, or `ADMIN` |
-| `GET` | `/api/students` | Lists all students. | `TEACHER` or `ADMIN` |
-| `GET` | `/api/students/{id}` | Fetches one student by numeric id. | Any authenticated user in current config |
+| `POST` | `/api/teachers/register` | Creates a teacher profile. | Public |
+| `PUT` | `/api/teachers/{id}` | Updates a teacher profile. | `TEACHER` |
+| `GET` | `/api/teachers` | Lists teachers. | `TEACHER` |
+| `POST` | `/api/students/register` | Creates a student profile. | `TEACHER` or `ADMIN` |
+| `PUT` | `/api/students/{id}` | Updates student profile fields such as name, password, course, and class group. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `GET` | `/api/students` | Lists students. | `TEACHER` or `ADMIN` |
+| `GET` | `/api/students/{id}` | Fetches one student profile by numeric student-table id. | Authenticated |
 
 ### Courses, Class Groups, and Enrollment
 
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `POST` | `/api/courses` | Creates a course linked to the currently logged-in teacher. Body is the `Course` entity, mainly `name` and `code`. | `TEACHER` |
+| `POST` | `/api/courses` | Creates a course linked to the logged-in teacher. | `TEACHER` |
 | `GET` | `/api/courses` | Lists all courses. | Public |
-| `POST` | `/api/class-groups` | Creates a class group. Body is the `ClassGroup` entity, mainly `name` plus its `course`. | `TEACHER` |
+| `POST` | `/api/class-groups` | Creates a class group. | `TEACHER` |
 | `GET` | `/api/class-groups` | Lists all class groups. | Public |
 | `GET` | `/api/class-groups/course/{courseId}` | Lists class groups for one course. | Public |
-| `POST` | `/api/course-enrollments` | Enrolls a student into a course. Body: `course_id`, `student_id`. | Any authenticated user in current config |
-| `GET` | `/api/course-enrollments` | Lists all enrollments. | Any authenticated user in current config |
-| `GET` | `/api/course-enrollments/course/{courseId}` | Lists enrollments for one course. | Any authenticated user in current config |
-| `GET` | `/api/course-enrollments/student/{studentId}` | Lists enrollments for one student. | Any authenticated user in current config |
-| `DELETE` | `/api/course-enrollments` | Removes an enrollment. Body: `course_id`, `student_id`. | Any authenticated user in current config |
+| `POST` | `/api/course-enrollments` | Enrolls a student into a course. | `TEACHER` or `ADMIN` |
+| `GET` | `/api/course-enrollments` | Lists all enrollments. | `TEACHER` or `ADMIN` |
+| `GET` | `/api/course-enrollments/course/{courseId}` | Lists enrollments for one course. | `TEACHER` or `ADMIN` |
+| `GET` | `/api/course-enrollments/student/{studentId}` | Lists enrollments for one student. | `TEACHER` or `ADMIN` |
+| `DELETE` | `/api/course-enrollments` | Removes an enrollment. | `TEACHER` or `ADMIN` |
 
 ### Additional Account Endpoints Present in the Codebase
 
-These sit slightly outside the ownership summary above, but they exist in the current controllers and are closest to the same profile/account area.
-
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `POST` | `/api/admins/register` | Creates an admin profile. Body: `email`, `password`, `fullName`. | Public |
-| `PUT` | `/api/admins/{id}` | Updates admin profile fields such as `fullName` and `password`. | `ADMIN` |
+| `POST` | `/api/admins/register` | Creates an admin profile. | Public |
+| `PUT` | `/api/admins/{id}` | Updates an admin profile. | `ADMIN` |
 | `GET` | `/api/admins` | Lists admins. | `ADMIN` |
-| `POST` | `/api/guests/register` | Creates a guest profile. Body: `email`, `password`, `fullName`. | Public |
-| `PUT` | `/api/guests/{id}` | Updates guest profile fields such as `fullName` and `password`. | `GUEST` |
+| `POST` | `/api/guests/register` | Creates a guest profile. | Public |
+| `PUT` | `/api/guests/{id}` | Updates a guest profile. | `GUEST` |
 | `GET` | `/api/guests` | Lists guests. | `GUEST` |
+
+Notes:
+
+- Course assignment now matters to the exam flow: student exam visibility is filtered by direct course linkage and course enrollments.
+- Credentials live in the shared auth model; the profile modules own the rest of the identity data.
 
 ## Group A - Exam Module
 
@@ -130,7 +175,7 @@ DRAFT -> PUBLISHED -> CLOSED
   +---- UNPUBLISH
 ```
 
-`CreateExamRequest` fields:
+`CreateExamRequest` supports:
 
 - `courseId`
 - `title`
@@ -142,75 +187,77 @@ DRAFT -> PUBLISHED -> CLOSED
 
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `POST` | `/api/exams` | Creates a draft exam. `seedSql` and `visibilityMode` are required by the service. | Any authenticated user in current config |
-| `GET` | `/api/exams/{examId}` | Fetches one exam. | Any authenticated user in current config |
-| `GET` | `/api/exams/course/{courseId}` | Lists exams for one course. | Any authenticated user in current config |
-| `GET` | `/api/exams/published` | Lists exams with `status = PUBLISHED`. | Any authenticated user in current config |
-| `PUT` | `/api/exams/{examId}` | Updates a draft exam. Only `DRAFT` exams can be edited. | Any authenticated user in current config |
-| `PATCH` | `/api/exams/{examId}/publish` | Publishes a draft exam. Requires `seedSql` and `visibilityMode`. | Any authenticated user in current config |
-| `PATCH` | `/api/exams/{examId}/unpublish` | Moves a published exam back to `DRAFT`. | Any authenticated user in current config |
-| `PATCH` | `/api/exams/{examId}/close` | Closes a published exam. | Any authenticated user in current config |
-| `DELETE` | `/api/exams/{examId}` | Deletes a draft exam. | Any authenticated user in current config |
+| `POST` | `/api/exams` | Creates a draft exam. | `TEACHER` or `ADMIN` |
+| `GET` | `/api/exams/{examId}` | Fetches one exam. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `GET` | `/api/exams/course/{courseId}` | Lists exams for one course. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `GET` | `/api/exams/published` | Lists published exams visible to the current user. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `PUT` | `/api/exams/{examId}` | Updates a draft exam. | `TEACHER` or `ADMIN` |
+| `PATCH` | `/api/exams/{examId}/publish` | Publishes a draft exam. | `TEACHER` or `ADMIN` |
+| `PATCH` | `/api/exams/{examId}/unpublish` | Moves a published exam back to draft. | `TEACHER` or `ADMIN` |
+| `PATCH` | `/api/exams/{examId}/close` | Closes a published exam. | `TEACHER` or `ADMIN` |
+| `DELETE` | `/api/exams/{examId}` | Deletes a draft exam. | `TEACHER` or `ADMIN` |
 
 Notes:
 
-- `ExamResponse` currently returns `seedSql`, so callers receive the raw exam dataset seed.
-- The service enforces business rules around `DRAFT`, `PUBLISHED`, and `CLOSED`, even where route-level role checks are broad.
+- Students only receive exams that are both `PUBLISHED` and assigned to them.
+- Student-facing `ExamResponse` values hide `seedSql`.
+- `maxAttempts` now defaults to `1` if omitted.
+- Only `DRAFT` exams can be edited or deleted.
+- Publishing requires both `seedSql` and `visibilityMode`.
 
 ## Group I - Question Module
 
 Base path: `/api/exams/{examId}/questions`
 
-When a teacher adds a question, the service immediately:
+When a teacher creates or updates a question, the service:
 
-1. Saves the question.
-2. Provisions a temporary sandbox using the exam's `seedSql`.
-3. Runs the teacher's `referenceQuery`.
-4. Stores the answer key JSON.
-5. Tears the sandbox down.
+1. saves the question
+2. provisions a temporary sandbox seeded from the exam dataset
+3. runs the teacher's `referenceQuery`
+4. stores the normalized answer key JSON
+5. tears the sandbox down
 
-`QuestionRequest` fields:
+`QuestionRequest` supports:
 
 - `prompt`
 - `referenceQuery`
 - `marks`
 - `orderIndex`
-- `orderSensitive` default `false`
-- `partialMarks` default `false`
+- `orderSensitive`
+- `partialMarks`
 
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `POST` | `/api/exams/{examId}/questions` | Creates a question and generates the answer key immediately from `referenceQuery`. | Authenticated; controller also declares `TEACHER` or `ADMIN` intent with `@PreAuthorize` |
-| `GET` | `/api/exams/{examId}/questions` | Lists questions ordered by `orderIndex`. | Authenticated; controller also declares `TEACHER`, `STUDENT`, or `ADMIN` intent with `@PreAuthorize` |
+| `POST` | `/api/exams/{examId}/questions` | Creates a question and generates the answer key immediately. | `TEACHER` or `ADMIN` |
+| `PUT` | `/api/exams/{examId}/questions/{questionId}` | Updates a question and regenerates the answer key immediately. | `TEACHER` or `ADMIN` |
+| `GET` | `/api/exams/{examId}/questions` | Lists questions ordered by `orderIndex`. | `STUDENT`, `TEACHER`, or `ADMIN` |
 
 Notes:
 
-- `QuestionResponse` currently includes `referenceQuery`, so student-facing clients should handle that carefully.
-- If answer-key generation fails, the question creation transaction fails too.
+- Students can only fetch questions for exams that are published and assigned to them.
+- Student-facing question payloads hide `referenceQuery`.
+- If answer-key generation fails, question creation or update fails as well.
 
 ## Group D - Sandbox Module
 
-In the current codebase, the exam runtime is split into two API surfaces:
+The runtime exam attempt flow is split into session endpoints and direct sandbox support endpoints.
 
-- `/api/sessions` manages attempt/session records.
-- `/api/sandboxes` manages the actual PostgreSQL schemas.
-
-### Session Lifecycle Endpoints
+### Session Lifecycle
 
 Base path: `/api/sessions`
 
-| Method | Path | What it does | Access |
-|---|---|---|---|
-| `POST` | `/api/sessions/start` | Starts a session for `examId` and `studentId`. Exam must already be `PUBLISHED`. Prevents duplicate session creation for the same student and exam. | Any authenticated user in current config |
-| `PATCH` | `/api/sessions/{sessionId}/submit` | Marks a session as submitted. Rejects double submission and rejects late submission after expiry. | Any authenticated user in current config |
-| `GET` | `/api/sessions/{sessionId}` | Returns one session. | Any authenticated user in current config |
-| `GET` | `/api/sessions/exam/{examId}` | Lists sessions for one exam. | Any authenticated user in current config |
-| `GET` | `/api/sessions/student/{studentId}` | Lists sessions for one student. | Any authenticated user in current config |
-
-`StartSessionRequest` fields:
+`StartSessionRequest` supports:
 
 - `examId`
 - `studentId`
+
+| Method | Path | What it does | Access |
+|---|---|---|---|
+| `POST` | `/api/sessions/start` | Starts a session, validates assignment, provisions the sandbox, and stores the real schema name. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `PATCH` | `/api/sessions/{sessionId}/submit` | Submits the session and tears the sandbox down. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `GET` | `/api/sessions/{sessionId}` | Returns one session. Students are limited to their own sessions. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `GET` | `/api/sessions/student/{studentId}` | Lists sessions for one student. Students are limited to their own sessions. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `GET` | `/api/sessions/exam/{examId}` | Lists sessions for one exam. | `TEACHER` or `ADMIN` |
 
 Session response fields include:
 
@@ -224,26 +271,30 @@ Session response fields include:
 - `isSubmitted`
 - `isExpired`
 
-### Sandbox Provisioning Endpoints
+Current behavior:
+
+- a student can only have one active session per exam at a time
+- `maxAttempts` is enforced from the exam definition
+- session start requires the exam to be `PUBLISHED`
+- session expiry is auto-submitted by a scheduler running every 60 seconds
+- expired sessions encountered during reads are also auto-submitted
+- session submit and auto-submit both tear the sandbox down
+
+### Direct Sandbox Endpoints
 
 Base path: `/api/sandboxes`
 
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `POST` | `/api/sandboxes/provision` | Creates or reuses the sandbox schema for one `examId` and `studentId`, then seeds it with `seedSql`. | Any authenticated user in current config |
-| `GET` | `/api/sandboxes/{examId}/students/{studentId}` | Returns active sandbox connection details. | Any authenticated user in current config |
-| `DELETE` | `/api/sandboxes/{examId}/students/{studentId}` | Drops the sandbox schema and marks it dropped in the registry. | Any authenticated user in current config |
+| `POST` | `/api/sandboxes/provision` | Provisions or reuses a sandbox schema and seeds it with the supplied SQL. | `TEACHER` or `ADMIN` |
+| `GET` | `/api/sandboxes/{examId}/students/{studentId}` | Returns sandbox connection details for an active schema. | `TEACHER` or `ADMIN` |
+| `DELETE` | `/api/sandboxes/{examId}/students/{studentId}` | Drops the sandbox schema and marks it dropped in the registry. | `TEACHER` or `ADMIN` |
 
-`SandboxProvisionRequest` fields:
+Notes:
 
-- `examId`
-- `studentId`
-- `seedSql`
-
-Important implementation note:
-
-- Starting a session now provisions the student's sandbox automatically and stores the real schema name returned by `SandboxService`.
-- Submitting a session tears the sandbox down automatically. The `/api/sandboxes/**` endpoints are still available for direct lifecycle management when needed.
+- The normal student flow should use `/api/sessions/start`, not manual sandbox provisioning.
+- Sandbox schema names now follow the exam/student identity pattern instead of relying on a local README-only sequence.
+- Sandbox connection info comes from the configured sandbox data source.
 
 ## Group G - Query Engine
 
@@ -251,22 +302,49 @@ Base path: `/api/query`
 
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `POST` | `/api/query/submit` | Grades one student SQL submission. Body: `examId`, `questionId`, `studentId`, `query`. | Any authenticated user in current config |
+| `POST` | `/api/query/submit` | Grades one student SQL submission against the answer key. | `STUDENT`, `TEACHER`, or `ADMIN` |
+
+`SubmissionRequest` supports:
+
+- `sessionId` optional
+- `examId`
+- `questionId`
+- `studentId`
+- `query`
 
 What happens during grading:
 
-1. The query is validated against a destructive-SQL blocklist.
-2. The student's sandbox is resolved from Group D.
-3. SQL is executed with a hard 10-second timeout.
-4. The result set is normalized and compared to the stored answer key.
-5. The submission is saved with `isCorrect`, `score`, and optional `executionError`.
-6. A `Result` record is created or refreshed for that submission so the results module can expose it immediately.
+1. the service validates that the question belongs to the supplied exam
+2. the active exam session is resolved and validated
+3. the SQL is checked against the blocklist
+4. the student's sandbox is resolved
+5. the SQL runs with a hard 10-second timeout
+6. the result set is compared to the stored answer key
+7. a submission row is saved with score, correctness, and captured result-set JSON
+8. the results module is notified so the `results` table stays synchronized
 
-Scoring behavior in the current service:
+Current scoring behavior:
 
-- Exact match: full marks
-- Partial marks enabled and row count matches: half marks
-- Validation failure, timeout, or execution failure: `executionError` is returned and the submission is still saved
+- exact match: full marks
+- `partialMarks = true` and matching row count: half marks
+- blocklist failure, timeout, or execution failure: returned as `executionError`
+
+`SubmissionResponse` includes:
+
+- `submissionId`
+- `sessionId`
+- `isCorrect`
+- `score`
+- `executionError`
+- `resultsVisible`
+- `resultColumns`
+- `resultRows`
+
+Visibility behavior on submit:
+
+- `IMMEDIATE`: returns score, correctness, and result-set data right away
+- `END_OF_EXAM`: saves the submission, but withholds marks and result rows from the submit response
+- `NEVER`: saves the submission, but withholds marks and result rows from the submit response
 
 ## Group C - Results Module
 
@@ -274,20 +352,66 @@ Base path: `/api/results`
 
 | Method | Path | What it does | Access |
 |---|---|---|---|
-| `GET` | `/api/results/session/{sessionId}` | Returns session results visible to a student. | Any authenticated user in current config |
-| `GET` | `/api/results/exam/{examId}/dashboard` | Returns teacher dashboard results for an exam. | Authenticated; controller also declares `TEACHER` intent with `@PreAuthorize` |
+| `GET` | `/api/results/session/{sessionId}` | Returns the student-facing result view for a single session. | `STUDENT`, `TEACHER`, or `ADMIN` |
+| `GET` | `/api/results/exam/{examId}/dashboard` | Returns the teacher dashboard rows for an exam. | `TEACHER` or `ADMIN` |
 
-Current behavior:
+### Student Result View
 
-- Student result visibility is now driven by the real `Exam.visibilityMode`.
-- `IMMEDIATE` shows results as soon as submissions are graded.
-- `END_OF_EXAM` hides results until the exam is moved to `CLOSED`.
-- `NEVER` returns no student-visible results.
-- Query submissions now flow into the `results` table automatically through `processNewSubmission(...)`.
+`GET /api/results/session/{sessionId}` now returns `StudentExamResultDto`, not raw `Result` entities.
 
-## Runtime Notes
+Top-level fields:
 
-- The app runs on `http://localhost:8084`.
-- Method-level security is enabled through `@EnableMethodSecurity`.
-- Sandbox cleanup scheduling is enabled through `@EnableScheduling`.
-- The older `/api/users/**` and `/api/users/me` docs were removed because those controllers do not exist in the current project.
+- `sessionId`
+- `examId`
+- `studentId`
+- `visibilityMode`
+- `visible`
+- `totalScore`
+- `totalMaxScore`
+- `questions`
+
+Each question row includes:
+
+- `questionId`
+- `prompt`
+- `submittedQuery`
+- `score`
+- `maxScore`
+- `isCorrect`
+- `submittedAt`
+- `resultColumns`
+- `resultRows`
+
+Current visibility behavior:
+
+- `IMMEDIATE`: visible immediately after grading
+- `END_OF_EXAM`: visible once the student's attempt has ended by submission or expiry, and also visible after the exam is closed
+- `NEVER`: hidden from the student view
+
+### Teacher Dashboard
+
+`GET /api/results/exam/{examId}/dashboard` returns one row per latest student submission per question:
+
+- `studentId`
+- `studentName`
+- `sessionId`
+- `questionId`
+- `questionPrompt`
+- `score`
+- `maxScore`
+- `isCorrect`
+- `submittedQuery`
+- `submittedAt`
+
+Notes:
+
+- result rows are synchronized automatically when a new query submission is saved
+- the dashboard aggregates from the latest submission per student/question pair
+
+## Current Backend Notes
+
+These are still worth knowing while working on the backend:
+
+- `GET /api/students/{id}` is still a general authenticated read endpoint in the current controller layer
+- partial marking is intentionally simple right now: half marks when row count matches and `partialMarks` is enabled
+- there is still no dedicated backend feature for revealing teacher reference queries to students after an exam, which matches the project brief's nice-to-have scope rather than its must-have scope

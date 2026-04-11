@@ -1,5 +1,6 @@
 package com.year2.queryme.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -18,7 +19,7 @@ public class QueryExecutor {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public QueryExecutor(JdbcTemplate jdbcTemplate) {
+    public QueryExecutor(@Qualifier("sandboxJdbcTemplate") JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 

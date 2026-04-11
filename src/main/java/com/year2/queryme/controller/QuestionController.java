@@ -27,6 +27,15 @@ public class QuestionController {
         return new ResponseEntity<>(questionService.createQuestion(examId, request), HttpStatus.CREATED);
     }
 
+    @PutMapping("/{questionId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_TEACHER', 'TEACHER', 'ROLE_ADMIN', 'ADMIN')")
+    public ResponseEntity<QuestionResponse> updateQuestion(
+            @PathVariable UUID examId,
+            @PathVariable UUID questionId,
+            @RequestBody QuestionRequest request) {
+        return ResponseEntity.ok(questionService.updateQuestion(examId, questionId, request));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_TEACHER', 'TEACHER', 'ROLE_STUDENT', 'STUDENT', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<List<QuestionResponse>> getQuestionsForExam(@PathVariable UUID examId) {
