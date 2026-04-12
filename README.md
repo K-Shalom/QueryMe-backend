@@ -144,6 +144,7 @@ These endpoints own profile records, course structure, and teacher-driven studen
 | `PUT` | `/teachers/{id}` | Updates a teacher profile. | `TEACHER` or `ADMIN` |
 | `GET` | `/teachers` | Lists teachers. | `TEACHER` or `ADMIN` |
 | `POST` | `/students/register` | Creates a student profile. | `TEACHER` or `ADMIN` |
+| `POST` | `/students/register/bulk` | Creates multiple student profiles atomically from an array of student registration payloads. | `TEACHER` or `ADMIN` |
 | `PUT` | `/students/{id}` | Updates student profile fields such as name, password, course, and class group. | `STUDENT`, `TEACHER`, or `ADMIN` |
 | `GET` | `/students` | Lists students. | `TEACHER` or `ADMIN` |
 | `GET` | `/students/{id}` | Fetches one student profile by numeric student-table id. | `STUDENT`, `TEACHER`, or `ADMIN` |
@@ -162,6 +163,17 @@ These endpoints own profile records, course structure, and teacher-driven studen
 | `GET` | `/course-enrollments/course/{courseId}` | Lists enrollments for one course. | `TEACHER` or `ADMIN` |
 | `GET` | `/course-enrollments/student/{studentId}` | Lists enrollments for one student. | `TEACHER` or `ADMIN` |
 | `DELETE` | `/course-enrollments` | Removes an enrollment. Accepts the same identifier formats as the create endpoint. | `TEACHER` or `ADMIN` |
+
+Student registration payloads support:
+
+- `email`
+- `password`
+- `fullName`
+- optional `courseId`
+- optional `classGroupId`
+- optional `student_number` or `studentNumber`
+
+`POST /students/register/bulk` accepts a JSON array of those payloads and rolls the whole request back if any student in the batch fails validation or hits a duplicate email/student number.
 
 ### Additional Account Endpoints Present in the Codebase
 
