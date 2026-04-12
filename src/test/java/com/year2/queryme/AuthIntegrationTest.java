@@ -5,7 +5,10 @@ import com.year2.queryme.model.dto.InitializeSuperAdminRequest;
 import com.year2.queryme.model.dto.LoginRequest;
 import com.year2.queryme.model.dto.SignupRequest;
 import com.year2.queryme.repository.AdminRepository;
+import com.year2.queryme.repository.CourseEnrollmentRepository;
+import com.year2.queryme.repository.CourseRepository;
 import com.year2.queryme.repository.StudentRepository;
+import com.year2.queryme.repository.TeacherRepository;
 import com.year2.queryme.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,10 +48,22 @@ public class AuthIntegrationTest {
     private AdminRepository adminRepository;
 
     @Autowired
+    private TeacherRepository teacherRepository;
+
+    @Autowired
+    private CourseRepository courseRepository;
+
+    @Autowired
+    private CourseEnrollmentRepository courseEnrollmentRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void cleanDatabase() {
+        courseEnrollmentRepository.deleteAll();
+        courseRepository.deleteAll();
+        teacherRepository.deleteAll();
         adminRepository.deleteAll();
         studentRepository.deleteAll();
         userRepository.deleteAll();

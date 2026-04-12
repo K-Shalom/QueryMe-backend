@@ -157,11 +157,11 @@ These endpoints own profile records, course structure, and teacher-driven studen
 | `POST` | `/class-groups` | Creates a class group. | `TEACHER` |
 | `GET` | `/class-groups` | Lists all class groups. | Public |
 | `GET` | `/class-groups/course/{courseId}` | Lists class groups for one course. | Public |
-| `POST` | `/course-enrollments` | Enrolls a student into a course. | `TEACHER` or `ADMIN` |
+| `POST` | `/course-enrollments` | Enrolls a student into a course. Accepts `courseId` and `studentId` as query params or JSON body fields; legacy `course_id` and `student_id` body fields still work. | `TEACHER` or `ADMIN` |
 | `GET` | `/course-enrollments` | Lists all enrollments. | `TEACHER` or `ADMIN` |
 | `GET` | `/course-enrollments/course/{courseId}` | Lists enrollments for one course. | `TEACHER` or `ADMIN` |
 | `GET` | `/course-enrollments/student/{studentId}` | Lists enrollments for one student. | `TEACHER` or `ADMIN` |
-| `DELETE` | `/course-enrollments` | Removes an enrollment. | `TEACHER` or `ADMIN` |
+| `DELETE` | `/course-enrollments` | Removes an enrollment. Accepts the same identifier formats as the create endpoint. | `TEACHER` or `ADMIN` |
 
 ### Additional Account Endpoints Present in the Codebase
 

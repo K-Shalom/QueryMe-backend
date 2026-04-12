@@ -27,12 +27,23 @@ public class CourseEnrollmentController {
     private StudentRepository studentRepository;
 
     @PostMapping
-    public CourseEnrollment enrollStudent(@RequestBody Map<String, String> data) {
-        Long courseId = Long.parseLong(data.get("course_id"));
+    public CourseEnrollment enrollStudent(
+            @RequestParam(name = "courseId", required = false) String courseIdParam,
+            @RequestParam(name = "course_id", required = false) String courseIdSnakeParam,
+            @RequestParam(name = "studentId", required = false) String studentIdParam,
+            @RequestParam(name = "student_id", required = false) String studentIdSnakeParam,
+            @RequestBody(required = false) Map<String, String> data) {
+        Long courseId = resolveRequiredId("courseId", firstNonBlank(
+                courseIdParam,
+                courseIdSnakeParam,
+                valueFromBody(data, "courseId", "course_id")));
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
-        
-        Long studentId = Long.parseLong(data.get("student_id"));
+
+        Long studentId = resolveRequiredId("studentId", firstNonBlank(
+                studentIdParam,
+                studentIdSnakeParam,
+                valueFromBody(data, "studentId", "student_id")));
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
@@ -61,12 +72,52 @@ public class CourseEnrollmentController {
     }
     
     @DeleteMapping
-    public void unenrollStudent(@RequestBody Map<String, String> data) {
-        Long courseId = Long.parseLong(data.get("course_id"));
-        Long studentId = Long.parseLong(data.get("student_id"));
-        
+    public void unenrollStudent(
+            @RequestParam(name = "courseId", required = false) String courseIdParam,
+            @RequestParam(name = "course_id", required = false) String courseIdSnakeParam,
+            @RequestParam(name = "studentId", required = false) String studentIdParam,
+            @RequestParam(name = "student_id", required = false) String studentIdSnakeParam,
+            @RequestBody(required = false) Map<String, String> data) {
+        Long courseId = resolveRequiredId("courseId", firstNonBlank(
+                courseIdParam,
+                courseIdSnakeParam,
+                valueFromBody(data, "courseId", "course_id")));
+        Long studentId = resolveRequiredId("studentId", firstNonBlank(
+                studentIdParam,
+                studentIdSnakeParam,
+                valueFromBody(data, "studentId", "student_id")));
+
         CourseEnrollment enrollment = courseEnrollmentRepository.findByCourseIdAndStudentId(courseId, studentId)
                 .orElseThrow(() -> new RuntimeException("Enrollment not found"));
         courseEnrollmentRepository.delete(enrollment);
+    }
+
+    private Long resolveRequiredId(String fieldName, String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+
+        try {
+            return Long.parseLong(rawValue);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException(fieldName + " must be a valid number");
+        }
+    }
+
+    private String valueFromBody(Map<String, String> data, String camelCaseKey, String snakeCaseKey) {
+        if (data == null) {
+            return null;
+        }
+
+        return firstNonBlank(data.get(camelCaseKey), data.get(snakeCaseKey));
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }
