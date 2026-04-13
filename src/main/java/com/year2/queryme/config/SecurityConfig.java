@@ -98,6 +98,8 @@ public class SecurityConfig {
                         // ── TEACHER or ADMIN ───────────────────────────
                         .requestMatchers(HttpMethod.POST, "/students/register")
                         .hasAnyRole("TEACHER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/students/register/bulk")
+                        .hasAnyRole("TEACHER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/students")
                         .hasAnyRole("TEACHER", "ADMIN")
                         .requestMatchers("/course-enrollments/**")

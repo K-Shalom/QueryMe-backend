@@ -1,6 +1,7 @@
 package com.year2.queryme.controller;
 
 import com.year2.queryme.model.Student;
+import com.year2.queryme.model.dto.StudentRegistrationRequest;
 import com.year2.queryme.model.enums.UserTypes;
 import com.year2.queryme.repository.StudentRepository;
 import com.year2.queryme.service.CurrentUserService;
@@ -27,14 +28,14 @@ public class StudentController {
 
     @PostMapping("/register")
     @PreAuthorize("hasAnyRole('TEACHER', 'ADMIN')")
-    public Student register(@RequestBody Map<String, String> data) {
-        return studentService.registerStudent(
-                data.get("email"),
-                data.get("password"),
-                data.get("fullName"),
-                data.containsKey("courseId") ? Long.parseLong(data.get("courseId")) : null,
-                data.containsKey("classGroupId") ? Long.parseLong(data.get("classGroupId")) : null,
-                data.get("student_number"));
+    public Student register(@RequestBody StudentRegistrationRequest request) {
+        return studentService.registerStudent(request);
+    }
+
+    @PostMapping("/register/bulk")
+    @PreAuthorize("hasAnyRole('TEACHER', 'ADMIN')")
+    public List<Student> registerBulk(@RequestBody List<StudentRegistrationRequest> requests) {
+        return studentService.registerStudents(requests);
     }
 
     @PutMapping("/{id}")
