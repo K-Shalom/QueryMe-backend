@@ -7,6 +7,8 @@ import com.year2.queryme.repository.StudentRepository;
 import com.year2.queryme.service.CurrentUserService;
 import com.year2.queryme.service.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -46,8 +48,8 @@ public class StudentController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('TEACHER', 'ADMIN')")
-    public List<Student> getAll() {
-        return studentRepository.findAll();
+    public Page<Student> getAll(Pageable pageable) {
+        return studentRepository.findAll(pageable);
     }
 
     @GetMapping("/{id}")

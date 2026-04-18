@@ -2,6 +2,7 @@ package com.year2.queryme.security;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.year2.queryme.model.User;
+import com.year2.queryme.model.enums.UserTypes;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,6 +17,7 @@ public class UserDetailsImpl implements UserDetails {
     private UUID id;
     private String email;
     private String name;
+    private UserTypes role;
 
     @JsonIgnore
     private String password;
@@ -23,11 +25,13 @@ public class UserDetailsImpl implements UserDetails {
     private Collection<? extends GrantedAuthority> authorities;
 
     public UserDetailsImpl(UUID id, String email, String name, String password,
+                           UserTypes role,
                            Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.email = email;
         this.name = name;
         this.password = password;
+        this.role = role;
         this.authorities = authorities;
     }
 
@@ -39,6 +43,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getEmail(),
                 user.getName(),
                 user.getPasswordHash(),
+            user.getRole(),
                 Collections.singletonList(authority));
     }
 
@@ -57,6 +62,10 @@ public class UserDetailsImpl implements UserDetails {
 
     public String getName() {
         return name;
+    }
+
+    public UserTypes getRole() {
+        return role;
     }
 
     @Override

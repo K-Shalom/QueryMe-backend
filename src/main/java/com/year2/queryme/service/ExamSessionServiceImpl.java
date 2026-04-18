@@ -15,6 +15,8 @@ import com.year2.queryme.sandbox.service.SandboxService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -117,23 +119,19 @@ public class ExamSessionServiceImpl implements ExamSessionService {
     }
 
     @Override
-    public List<ExamSessionResponse> getSessionsByExam(String examId) {
+    public Page<ExamSessionResponse> getSessionsByExam(String examId, Pageable pageable) {
         assertCurrentUserCanViewExamSessions();
-        return sessionRepository.findByExamId(examId)
-                .stream()
+        return sessionRepository.findByExamId(examId, pageable)
                 .map(session -> isExpiredAndOpen(session) ? autoSubmit(session) : session)
-                .map(ExamSessionMapper::toResponse)
-                .collect(Collectors.toList());
+                .map(ExamSessionMapper::toResponse);
     }
 
     @Override
-    public List<ExamSessionResponse> getSessionsByStudent(String studentId) {
+    public Page<ExamSessionResponse> getSessionsByStudent(String studentId, Pageable pageable) {
         assertCurrentUserCanAccessStudentId(studentId);
-        return sessionRepository.findByStudentId(studentId)
-                .stream()
+        return sessionRepository.findByStudentId(studentId, pageable)
                 .map(session -> isExpiredAndOpen(session) ? autoSubmit(session) : session)
-                .map(ExamSessionMapper::toResponse)
-                .collect(Collectors.toList());
+                .map(ExamSessionMapper::toResponse);
     }
 
     private ExamSession findById(String sessionId) {

@@ -9,7 +9,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "sandbox_registry")
+@Table(
+    name = "sandbox_registry",
+    indexes = {
+        @Index(name = "idx_sandbox_exam_student", columnList = "exam_id, student_id"),
+        @Index(name = "idx_sandbox_status_expires", columnList = "status, expires_at")
+    }
+)
 @Data
 @NoArgsConstructor
 public class SandboxRegistry {

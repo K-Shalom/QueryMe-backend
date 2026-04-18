@@ -82,6 +82,86 @@ These backend changes now match the intended QueryMe flow more closely:
 - query execution now adapts common MySQL syntax (`\`` identifiers, `IFNULL`, `LIMIT offset,count`, and simple MySQL DDL table options) to PostgreSQL-compatible SQL before validation/execution
 - final `INSERT`/`UPDATE`/`DELETE` statements now auto-append `RETURNING *` when omitted, so DML questions can still produce a comparable result set
 
+## Recent Performance Changes (April 2026)
+
+This backend received a performance-focused update. No brand-new API paths were introduced, but several existing endpoints and internals were improved for lower latency and better scaling.
+
+### What Changed Internally
+
+- reduced repeated authenticated-user lookups by reusing JWT principal details in `CurrentUserService`
+- optimized exam listing to avoid per-exam question-count queries by batching question counts
+- optimized teacher dashboard assembly by using projection queries (lightweight row views) instead of full entity loading
+- optimized submission processing to reuse the active session sandbox schema when available
+- reduced object allocations in partial-mark scoring logic
+- disabled verbose SQL logging in runtime config to reduce request-path I/O noise
+
+### Database Indexes Added
+
+Indexes were added via JPA entity metadata and are applied by Hibernate with the current `ddl-auto: update` strategy.
+
+- `submissions`
+  - `(exam_id, submitted_at)`
+  - `(session_id, submitted_at)`
+  - `(student_id, exam_id)`
+  - `(question_id)`
+- `exam_sessions`
+  - `(exam_id)`
+  - `(student_id)`
+  - `(exam_id, student_id, started_at)`
+  - `(submitted_at, expires_at)`
+- `questions`
+  - `(exam_id, order_index)`
+  - `(exam_id)`
+- `exams`
+  - `(course_id)`
+  - `(status)`
+  - `(course_id, status)`
+- `results`
+  - `(submission_id)`
+  - `(session_id)`
+  - `(exam_id, question_id)`
+- `sandbox_registry`
+  - `(exam_id, student_id)`
+  - `(status, expires_at)`
+
+### API Behavior Updates
+
+- list-style endpoints now support Spring pageable query params: `page`, `size`, `sort`
+- these endpoints now return paged JSON objects (`Page<T>`) instead of raw arrays
+- endpoint paths are unchanged (no new route paths were added for pagination)
+
+Paged endpoints:
+
+- `GET /students`
+- `GET /teachers`
+- `GET /admins`
+- `GET /guests`
+- `GET /courses`
+- `GET /class-groups`
+- `GET /class-groups/course/{courseId}`
+- `GET /course-enrollments`
+- `GET /course-enrollments/course/{courseId}`
+- `GET /course-enrollments/student/{studentId}`
+- `GET /exams/{examId}/questions`
+- `GET /sessions/exam/{examId}`
+- `GET /sessions/student/{studentId}`
+
+Paged response shape follows Spring Data defaults, including fields such as:
+
+- `content`
+- `number`
+- `size`
+- `totalElements`
+- `totalPages`
+- `first`
+- `last`
+
+Example:
+
+```http
+GET /students?page=0&size=20&sort=id,desc
+```
+
 ## Group Ownership Map
 
 | Group | Module | Responsibility |
@@ -486,3 +566,25 @@ These are still worth knowing while working on the backend:
 - `GET /students/{id}` enforces student self-access while teacher/admin can read any student
 - partial marking is intentionally simple right now: half marks when row count matches and `partialMarks` is enabled
 - there is still no dedicated backend feature for revealing teacher reference queries to students after an exam, which matches the project brief's nice-to-have scope rather than its must-have scope
+
+## Frontend Migration Checklist
+
+Use this when wiring the frontend to the current backend shape.
+
+- update list views to read `content` from Spring `Page<T>` responses instead of treating responses as raw arrays
+- read pagination metadata from `number`, `size`, `totalElements`, and `totalPages` when building list tables
+- pass `page`, `size`, and `sort` query params to the paged endpoints when fetching large lists
+- keep using the existing endpoint paths; only the response shape changed for list endpoints
+- handle hidden student fields correctly:
+  - `seedSql` is still hidden from student-facing exam responses
+  - `referenceQuery` is still hidden from student-facing question responses
+- render teacher dashboard rows from `GET /results/exam/{examId}/dashboard` as a paged or filtered table if the result set becomes large in the UI layer
+- prefer human-readable course, exam, and student names in the portal UI instead of exposing internal numeric IDs directly
+
+Useful examples:
+
+```http
+GET /students?page=0&size=20&sort=id,desc
+GET /exams/published?page=0&size=10&sort=createdAt,desc
+GET /sessions/exam/{examId}?page=0&size=25
+```

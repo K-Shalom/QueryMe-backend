@@ -14,7 +14,6 @@ import com.year2.queryme.repository.ExamRepository;
 import com.year2.queryme.repository.ExamSessionRepository;
 import com.year2.queryme.repository.QuestionRepository;
 import com.year2.queryme.repository.SubmissionRepository;
-import com.year2.queryme.sandbox.dto.SandboxConnectionInfo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.year2.queryme.sandbox.service.SandboxService;
@@ -84,19 +83,18 @@ public class QueryServiceImpl implements QueryService {
             submissionBuilder.sessionId(java.util.UUID.fromString(activeSession.getId()));
             persistSubmission = true;
 
-            // 1. Get Sandbox connection details
-            SandboxConnectionInfo sandboxInfo = sandboxService.getSandboxConnectionDetails(
-                request.getExamId(), request.getStudentId());
+            // 1. Resolve sandbox schema, preferring the active session value to avoid registry lookups.
+            String sandboxSchema = resolveSandboxSchema(activeSession, request);
 
             String adaptedQuery = sqlDialectAdapter.adaptForExecution(request.getQuery());
             String executableQuery = sqlDialectAdapter.ensureFinalStatementReturnsRows(adaptedQuery);
 
             // 2. Validate sandbox-scoped SQL
-            queryValidator.validate(executableQuery, sandboxInfo.schemaName(), false);
+            queryValidator.validate(executableQuery, sandboxSchema, false);
 
             // 3. Execute sandboxed SQL atomically inside the student's schema
             SandboxExecutionResult executionResult = queryExecutor.executeSandboxedScript(
-                sandboxInfo.schemaName(), executableQuery, 10, false); // 10s hard timeout
+                sandboxSchema, executableQuery, 10, false); // 10s hard timeout
             List<Map<String, Object>> studentResult = executionResult.rows();
                 
             // 4. Compare ResultSets
@@ -109,9 +107,8 @@ public class QueryServiceImpl implements QueryService {
                 finalScore = question.getMarks();
             } else if (Boolean.TRUE.equals(question.getPartialMarks())) {
                 // PARTIAL MARKS logic: if result count matches, give 50%
-                List<Map<String, Object>> expectedData = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .readValue(answerKey.getExpectedRows(), new com.fasterxml.jackson.core.type.TypeReference<>() {});
-                if (studentResult.size() == expectedData.size()) {
+                int expectedRowCount = objectMapper.readTree(answerKey.getExpectedRows()).size();
+                if (studentResult.size() == expectedRowCount) {
                     finalScore = question.getMarks() / 2;
                     submissionBuilder.executionError("Partial Credit: Row count matches, but data is incorrect.");
                 }
@@ -141,7 +138,7 @@ public class QueryServiceImpl implements QueryService {
 
         // 5. Save the Submission
         Submission submission = submissionRepository.save(submissionBuilder.build());
-        resultService.processNewSubmission(submission.getId());
+        resultService.processNewSubmission(submission, question);
         boolean immediateResultsVisible = exam.getVisibilityMode() == VisibilityMode.IMMEDIATE;
         boolean studentCaller = currentUserService.hasRole(UserTypes.STUDENT);
         String executionError = (!studentCaller || immediateResultsVisible)
@@ -192,6 +189,14 @@ public class QueryServiceImpl implements QueryService {
         if (session.getExpiresAt() != null && java.time.LocalDateTime.now().isAfter(session.getExpiresAt())) {
             throw new IllegalArgumentException("Session has expired");
         }
+    }
+
+    private String resolveSandboxSchema(ExamSession activeSession, SubmissionRequest request) {
+        if (activeSession.getSandboxSchema() != null && !activeSession.getSandboxSchema().isBlank()) {
+            return activeSession.getSandboxSchema();
+        }
+
+        return sandboxService.getSandboxConnectionDetails(request.getExamId(), request.getStudentId()).schemaName();
     }
 
     private List<String> parseColumns(String json) {

@@ -173,7 +173,7 @@ class QueryServiceImplTest {
         assertTrue(response.getExecutionError().contains("salary"));
         assertEquals(Boolean.TRUE, response.getResultsVisible());
         verify(submissionRepository).save(any(Submission.class));
-        verify(resultService).processNewSubmission(eq(submissionId));
+        verify(resultService).processNewSubmission(any(Submission.class), eq(question));
     }
 
     @Test
@@ -250,6 +250,6 @@ class QueryServiceImplTest {
         assertNull(response.getScore());
         assertNull(response.getIsCorrect());
         verify(submissionRepository).save(any(Submission.class));
-        verify(resultService).processNewSubmission(eq(submissionId));
+                verify(resultService).processNewSubmission(any(Submission.class), eq(question));
     }
 }

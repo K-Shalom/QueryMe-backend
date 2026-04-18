@@ -2,6 +2,7 @@ package com.year2.queryme.service;
 
 import com.year2.queryme.model.User;
 import com.year2.queryme.model.enums.UserTypes;
+import com.year2.queryme.security.UserDetailsImpl;
 import com.year2.queryme.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -23,15 +24,44 @@ public class CurrentUserService {
             throw new RuntimeException("No authenticated user found");
         }
 
+        if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
+            return User.builder()
+                    .id(userDetails.getId())
+                    .email(userDetails.getEmail())
+                    .name(userDetails.getName())
+                    .role(userDetails.getRole())
+                    .build();
+        }
+
         return userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
     }
 
     public UUID requireCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new RuntimeException("No authenticated user found");
+        }
+
+        if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
+            return userDetails.getId();
+        }
+
         return requireCurrentUser().getId();
     }
 
     public UserTypes requireCurrentRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new RuntimeException("No authenticated user found");
+        }
+
+        if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
+            return userDetails.getRole();
+        }
+
         return requireCurrentUser().getRole();
     }
 

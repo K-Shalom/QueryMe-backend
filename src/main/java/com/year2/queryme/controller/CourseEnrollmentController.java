@@ -7,9 +7,10 @@ import com.year2.queryme.repository.CourseEnrollmentRepository;
 import com.year2.queryme.repository.CourseRepository;
 import com.year2.queryme.repository.StudentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -57,18 +58,18 @@ public class CourseEnrollmentController {
     }
 
     @GetMapping
-    public List<CourseEnrollment> getAllEnrollments() {
-        return courseEnrollmentRepository.findAll();
+    public Page<CourseEnrollment> getAllEnrollments(Pageable pageable) {
+        return courseEnrollmentRepository.findAll(pageable);
     }
 
     @GetMapping("/course/{courseId}")
-    public List<CourseEnrollment> getEnrollmentsByCourse(@PathVariable Long courseId) {
-        return courseEnrollmentRepository.findByCourseId(courseId);
+    public Page<CourseEnrollment> getEnrollmentsByCourse(@PathVariable Long courseId, Pageable pageable) {
+        return courseEnrollmentRepository.findByCourseId(courseId, pageable);
     }
 
     @GetMapping("/student/{studentId}")
-    public List<CourseEnrollment> getEnrollmentsByStudent(@PathVariable Long studentId) {
-        return courseEnrollmentRepository.findByStudentId(studentId);
+    public Page<CourseEnrollment> getEnrollmentsByStudent(@PathVariable Long studentId, Pageable pageable) {
+        return courseEnrollmentRepository.findByStudentId(studentId, pageable);
     }
     
     @DeleteMapping

@@ -10,7 +10,15 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "submissions")
+@Table(
+    name = "submissions",
+    indexes = {
+        @Index(name = "idx_submissions_exam_submitted_at", columnList = "exam_id, submitted_at"),
+        @Index(name = "idx_submissions_session_submitted_at", columnList = "session_id, submitted_at"),
+        @Index(name = "idx_submissions_student_exam", columnList = "student_id, exam_id"),
+        @Index(name = "idx_submissions_question", columnList = "question_id")
+    }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

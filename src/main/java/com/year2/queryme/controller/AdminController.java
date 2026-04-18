@@ -4,10 +4,11 @@ import com.year2.queryme.model.Admin;
 import com.year2.queryme.repository.AdminRepository;
 import com.year2.queryme.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -38,7 +39,7 @@ public class AdminController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public List<Admin> getAll() {
-        return adminRepository.findAll();
+    public Page<Admin> getAll(Pageable pageable) {
+        return adminRepository.findAll(pageable);
     }
 }

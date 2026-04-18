@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -73,17 +75,15 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public List<QuestionResponse> getQuestionsForExam(UUID examId) {
+    public Page<QuestionResponse> getQuestionsForExam(UUID examId, Pageable pageable) {
         boolean includeReferenceQuery = !currentUserService.hasRole(UserTypes.STUDENT);
 
         if (currentUserService.hasRole(UserTypes.STUDENT)) {
             assertCurrentStudentCanAccessExam(examId);
         }
 
-        return questionRepository.findByExamIdOrderByOrderIndexAsc(examId)
-                .stream()
-                .map(question -> mapToResponse(question, includeReferenceQuery))
-                .collect(Collectors.toList());
+        return questionRepository.findByExamIdOrderByOrderIndexAsc(examId, pageable)
+                .map(question -> mapToResponse(question, includeReferenceQuery));
     }
 
     @Override

@@ -3,9 +3,10 @@ package com.year2.queryme.controller;
 import com.year2.queryme.model.dto.*;
 import com.year2.queryme.service.ExamSessionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/sessions")
@@ -33,14 +34,16 @@ public class ExamSessionController {
     }
 
     @GetMapping("/exam/{examId}")
-    public ResponseEntity<List<ExamSessionResponse>> getByExam(
-            @PathVariable String examId) {
-        return ResponseEntity.ok(sessionService.getSessionsByExam(examId));
+    public ResponseEntity<Page<ExamSessionResponse>> getByExam(
+            @PathVariable String examId,
+            Pageable pageable) {
+        return ResponseEntity.ok(sessionService.getSessionsByExam(examId, pageable));
     }
 
     @GetMapping("/student/{studentId}")
-    public ResponseEntity<List<ExamSessionResponse>> getByStudent(
-            @PathVariable String studentId) {
-        return ResponseEntity.ok(sessionService.getSessionsByStudent(studentId));
+    public ResponseEntity<Page<ExamSessionResponse>> getByStudent(
+            @PathVariable String studentId,
+            Pageable pageable) {
+        return ResponseEntity.ok(sessionService.getSessionsByStudent(studentId, pageable));
     }
 }

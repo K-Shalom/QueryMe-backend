@@ -5,7 +5,14 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "results")
+@Table(
+    name = "results",
+    indexes = {
+        @Index(name = "idx_results_submission", columnList = "submission_id"),
+        @Index(name = "idx_results_session", columnList = "session_id"),
+        @Index(name = "idx_results_exam_question", columnList = "exam_id, question_id")
+    }
+)
 @Data
 public class Result {
     @Id

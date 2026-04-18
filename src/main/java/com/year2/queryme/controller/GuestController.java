@@ -3,10 +3,11 @@ package com.year2.queryme.controller;
 import com.year2.queryme.model.Guest;
 import com.year2.queryme.repository.GuestRepository;
 import com.year2.queryme.service.GuestService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -34,7 +35,7 @@ public class GuestController {
     }
 
     @GetMapping
-    public List<Guest> getAll() {
-        return guestRepository.findAll();
+    public Page<Guest> getAll(Pageable pageable) {
+        return guestRepository.findAll(pageable);
     }
 }

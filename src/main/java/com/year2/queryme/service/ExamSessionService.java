@@ -1,12 +1,13 @@
 package com.year2.queryme.service;
 import com.year2.queryme.model.dto.*;
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 
 public interface ExamSessionService {
     ExamSessionResponse startSession(StartSessionRequest request);
     ExamSessionResponse submitSession(String sessionId);
     ExamSessionResponse getSessionById(String sessionId);
-    List<ExamSessionResponse> getSessionsByExam(String examId);
-    List<ExamSessionResponse> getSessionsByStudent(String studentId);
+    Page<ExamSessionResponse> getSessionsByExam(String examId, Pageable pageable);
+    Page<ExamSessionResponse> getSessionsByStudent(String studentId, Pageable pageable);
 }

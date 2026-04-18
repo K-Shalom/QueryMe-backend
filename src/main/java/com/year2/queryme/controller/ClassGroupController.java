@@ -3,10 +3,9 @@ package com.year2.queryme.controller;
 import com.year2.queryme.model.ClassGroup;
 import com.year2.queryme.repository.ClassGroupRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/class-groups")
@@ -21,12 +20,12 @@ public class ClassGroupController {
     }
 
     @GetMapping
-    public List<ClassGroup> getAll() {
-        return classGroupRepository.findAll();
+    public Page<ClassGroup> getAll(Pageable pageable) {
+        return classGroupRepository.findAll(pageable);
     }
 
     @GetMapping("/course/{courseId}")
-    public List<ClassGroup> getByCourse(@PathVariable Long courseId) {
-        return classGroupRepository.findByCourseId(courseId);
+    public Page<ClassGroup> getByCourse(@PathVariable Long courseId, Pageable pageable) {
+        return classGroupRepository.findByCourseId(courseId, pageable);
     }
 }

@@ -5,10 +5,10 @@ import com.year2.queryme.model.Teacher;
 import com.year2.queryme.repository.CourseRepository;
 import com.year2.queryme.repository.TeacherRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/courses")
@@ -36,11 +36,7 @@ public class CourseController {
     }
 
     @GetMapping
-    public List<Course> getAll() {
-        List<Course> courses = courseRepository.findAll();
-        System.out.println("--- DIAGNOSTIC: CURRENT COURSES IN DATABASE ---");
-        courses.forEach(c -> System.out.println("ID: [" + c.getId() + "] Name: " + c.getName()));
-        System.out.println("------------------------------------------------");
-        return courses;
+    public Page<Course> getAll(Pageable pageable) {
+        return courseRepository.findAll(pageable);
     }
 }

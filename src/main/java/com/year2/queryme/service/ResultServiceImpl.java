@@ -5,13 +5,15 @@ import com.year2.queryme.model.ExamSession;
 import com.year2.queryme.model.Question;
 import com.year2.queryme.model.Result;
 import com.year2.queryme.model.Submission;
-import com.year2.queryme.model.Student;
 import com.year2.queryme.model.dto.StudentExamResultDto;
 import com.year2.queryme.model.dto.StudentQuestionResultDto;
 import com.year2.queryme.model.dto.TeacherDashboardRowDto;
 import com.year2.queryme.model.enums.ExamStatus;
 import com.year2.queryme.model.enums.UserTypes;
 import com.year2.queryme.model.enums.VisibilityMode;
+import com.year2.queryme.repository.projection.QuestionSummaryView;
+import com.year2.queryme.repository.projection.StudentNameView;
+import com.year2.queryme.repository.projection.TeacherDashboardSubmissionView;
 import com.year2.queryme.repository.ExamRepository;
 import com.year2.queryme.repository.ExamSessionRepository;
 import com.year2.queryme.repository.QuestionRepository;
@@ -29,6 +31,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -117,23 +120,45 @@ public class ResultServiceImpl implements ResultService {
     }
 
     @Override
+    public void processNewSubmission(Submission submission, Question question) {
+        try {
+            saveQueryResult(submission, question, submission.getScore(), submission.getIsCorrect());
+        } catch (RuntimeException ex) {
+            log.warn("Could not synchronize submission {} into results yet: {}", submission.getId(), ex.getMessage());
+        }
+    }
+
+    @Override
     public List<TeacherDashboardRowDto> getResultsForTeacher(UUID examId) {
-        Map<String, Submission> latestSubmissions = new LinkedHashMap<>();
-        for (Submission submission : submissionRepository.findByExamIdOrderBySubmittedAtDesc(examId)) {
+        Map<String, TeacherDashboardSubmissionView> latestSubmissions = new LinkedHashMap<>();
+        for (TeacherDashboardSubmissionView submission : submissionRepository.findDashboardRowsByExamIdOrderBySubmittedAtDesc(examId)) {
             String key = submission.getStudentId() + ":" + submission.getQuestionId();
             latestSubmissions.putIfAbsent(key, submission);
         }
 
-        Map<UUID, Question> questionMap = questionRepository.findAll().stream()
-                .collect(Collectors.toMap(Question::getId, question -> question));
+        if (latestSubmissions.isEmpty()) {
+            return List.of();
+        }
+
+        Map<UUID, QuestionSummaryView> questionMap = questionRepository.findQuestionSummariesByExamId(examId)
+            .stream()
+            .collect(Collectors.toMap(QuestionSummaryView::getId, question -> question));
+
+        Set<UUID> studentUserIds = latestSubmissions.values().stream()
+            .map(TeacherDashboardSubmissionView::getStudentId)
+            .collect(Collectors.toSet());
+
+        Map<UUID, StudentNameView> studentsByUserId = studentRepository.findStudentNamesByUserIds(studentUserIds)
+                .stream()
+            .collect(Collectors.toMap(StudentNameView::getUserId, student -> student));
 
         return latestSubmissions.values().stream()
                 .map(submission -> {
-                    Student student = studentRepository.findByUser_Id(submission.getStudentId()).orElse(null);
-                    Question question = questionMap.get(submission.getQuestionId());
+                StudentNameView student = studentsByUserId.get(submission.getStudentId());
+                QuestionSummaryView question = questionMap.get(submission.getQuestionId());
                     return TeacherDashboardRowDto.builder()
                             .studentId(submission.getStudentId())
-                            .studentName(student != null ? student.getFullName() : submission.getStudentId().toString())
+                    .studentName(student != null ? student.getFullName() : submission.getStudentId().toString())
                             .sessionId(submission.getSessionId())
                             .questionId(submission.getQuestionId())
                             .questionPrompt(question != null ? question.getPrompt() : null)
@@ -155,10 +180,15 @@ public class ResultServiceImpl implements ResultService {
         Question question = questionRepository.findById(submission.getQuestionId())
                 .orElseThrow(() -> new RuntimeException("Question not found: " + submission.getQuestionId()));
 
-        Result result = resultRepository.findBySubmissionId(submissionId)
+        return saveQueryResult(submission, question, score, isCorrect);
+        }
+
+        @Override
+        public Result saveQueryResult(Submission submission, Question question, Integer score, Boolean isCorrect) {
+        Result result = resultRepository.findBySubmissionId(submission.getId())
                 .orElseGet(Result::new);
 
-        result.setSubmissionId(submissionId);
+        result.setSubmissionId(submission.getId());
         result.setQuestionId(submission.getQuestionId());
         result.setSessionId(submission.getSessionId());
         result.setExamId(submission.getExamId());
