@@ -16,6 +16,9 @@ public class AuthController {
     @Autowired
     AuthService authService;
 
+    @Autowired
+    com.year2.queryme.repository.AdminRepository adminRepository;
+
     @PostMapping("/signin")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
         return authService.authenticateUser(loginRequest);
@@ -30,5 +33,12 @@ public class AuthController {
     public ResponseEntity<?> initializeFirstSuperAdmin(
             @Valid @RequestBody InitializeSuperAdminRequest request) {
         return authService.initializeFirstSuperAdmin(request);
+    }
+
+    @PostMapping("/bootstrap/reset")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> resetBootstrap() {
+        adminRepository.deleteAll();
+        return ResponseEntity.ok(new com.year2.queryme.model.dto.MessageResponse("Bootstrap status reset. You can now bootstrap again."));
     }
 }

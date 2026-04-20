@@ -24,16 +24,31 @@ public class GuestService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private PasswordService passwordService;
+
+    @Autowired
+    private EmailService emailService;
+
     @Transactional
     public Guest registerGuest(String email, String password, String fullName) {
-        // 1. Create User
+        boolean mustReset = false;
+        if (password == null || password.isBlank()) {
+            password = passwordService.generateTemporaryPassword();
+            mustReset = true;
+            emailService.sendTemporaryPassword(email, password);
+        }
+
+        String passwordHash = passwordEncoder.encode(password);
         User user = User.builder()
                 .email(email)
-                .passwordHash(passwordEncoder.encode(password))
+                .passwordHash(passwordHash)
                 .role(UserTypes.GUEST)
                 .name(fullName)
+                .mustResetPassword(mustReset)
                 .build();
         userRepository.save(user);
+        passwordService.recordPassword(user, passwordHash);
 
         // 2. Create Guest linked to User
         Guest guest = Guest.builder()
@@ -60,8 +75,15 @@ public class GuestService {
         if (data.containsKey("password")) {
             User user = guest.getUser();
             if (user != null) {
-                user.setPasswordHash(passwordEncoder.encode(data.get("password")));
+                String newPassword = data.get("password");
+                if (passwordService.isPasswordUsed(user, newPassword)) {
+                    throw new RuntimeException("Cannot reuse a previous password");
+                }
+                String hash = passwordEncoder.encode(newPassword);
+                user.setPasswordHash(hash);
+                user.setMustResetPassword(false);
                 userRepository.save(user);
+                passwordService.recordPassword(user, hash);
             }
         }
 

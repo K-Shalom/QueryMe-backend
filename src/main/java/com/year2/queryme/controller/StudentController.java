@@ -29,13 +29,13 @@ public class StudentController {
     private CurrentUserService currentUserService;
 
     @PostMapping("/register")
-    @PreAuthorize("hasAnyRole('TEACHER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public Student register(@RequestBody StudentRegistrationRequest request) {
         return studentService.registerStudent(request);
     }
 
     @PostMapping("/register/bulk")
-    @PreAuthorize("hasAnyRole('TEACHER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<Student> registerBulk(@RequestBody List<StudentRegistrationRequest> requests) {
         return studentService.registerStudents(requests);
     }
@@ -65,5 +65,12 @@ public class StudentController {
         }
 
         return student;
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public org.springframework.http.ResponseEntity<?> delete(@PathVariable Long id) {
+        studentService.deleteStudent(id);
+        return org.springframework.http.ResponseEntity.ok(new com.year2.queryme.model.dto.MessageResponse("Student deleted successfully"));
     }
 }

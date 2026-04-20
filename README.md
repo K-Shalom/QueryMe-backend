@@ -588,3 +588,73 @@ GET /students?page=0&size=20&sort=id,desc
 GET /exams/published?page=0&size=10&sort=createdAt,desc
 GET /sessions/exam/{examId}?page=0&size=25
 ```
+
+## QueryMe Feedbacks - Group J (Auth) - Implementation Summary
+
+This section documents the security and user management enhancements implemented in April 2026.
+
+### 1. Auto-generated Temporary Passwords & Real Email Delivery
+- **Feature**: Admins can now register users without defining a password.
+- **Implementation**: 
+    - `PasswordService` generates a secure 16-character temporary password.
+    - `EmailService` sends this password to the user's real email address using **Spring Mail** (configured via `.env`).
+- **How to test**:
+    - **Endpoint**: `POST /students/register`
+    - **Payload**: Provide `email` and `fullName` but leave out the `password` field.
+    - **Result**: The user receives an email with their credentials, and a fallback copy is printed to the server logs.
+
+### 2. Forced Password Reset (First Login)
+- **Feature**: Users who receive a temporary password must change it before they can use the system.
+- **Implementation**: 
+    - Login via `POST /auth/signin` returns `"mustResetPassword": true`.
+    - This flag is cleared automatically after the user completes a profile update with a new password.
+- **How to test**:
+    - Sign in with a temporary password from Step 1.
+    - Observe the `mustResetPassword` flag in the response JSON.
+
+### 3. Strict Admin-Only Registration
+- **Feature**: Only the `ADMIN` role can create new user profiles. Teachers no longer have registration rights.
+- **Implementation**: Security rules in `SecurityConfig` and `@PreAuthorize` annotations in controllers.
+- **How to test**:
+    - Try calling `POST /students/register` using a `TEACHER` token.
+    - **Result**: `403 Forbidden`.
+
+### 4. Password History & Reuse Prevention
+- **Feature**: Users cannot reuse any of their previously used passwords.
+- **Implementation**: `PasswordHistory` entity records all previous password hashes. Checks are enforced during every password update.
+- **How to test**:
+    - Call `PUT /students/{id}` with a new password (e.g., `NewPass123!`).
+    - Attempt a second update with the same password (`NewPass123!`).
+    - **Result**: `400 Bad Request` with message: `"Cannot reuse a previous password"`.
+
+### 5. Restricted Public Signup
+- **Feature**: The public `/auth/signup` endpoint is now strictly reserved for students.
+- **How to test**:
+    - Call `POST /auth/signup` with `"role": "TEACHER"`.
+    - **Result**: Rejected with `"Error: Public signup only supports STUDENT accounts"`.
+
+### 6. Admin Student Deletion
+- **Feature**: Added a new administrative endpoint to remove students and their linked user accounts.
+- **How to test**:
+    - **Endpoint**: `DELETE /students/{id}`
+    - **Access**: `ADMIN` only.
+    - **Result**: Student profile and user credentials are removed via cascading deletion.
+
+### 7. Super Admin Reset (Utility)
+- **Feature**: Added a temporary utility to reset the super admin status if credentials are lost.
+- **Endpoint**: `POST /auth/bootstrap/reset` (Public).
+
+- sandbox validation and execution failures are reported in a normal `SubmissionResponse` instead of bubbling up as rollback-only transaction errors
+
+### API Endpoint Summary Table (New & Updated)
+
+| Method | Endpoint | Implementation Detail | Access |
+|---|---|---|---|
+| `POST` | `/auth/signin` | Returns JWT and `mustResetPassword` status | Public |
+| `POST` | `/auth/signup` | Self-registration, restricted to `STUDENT` | Public |
+| `POST` | `/auth/bootstrap/reset` | Resets super admin status for re-bootstrapping | Public |
+| `POST` | `/students/register` | Creates student + temp password + email | `ADMIN` only |
+| `DELETE` | `/students/{id}` | Permanently removes student and user account | `ADMIN` only |
+| `PUT` | `/students/{id}`| Updates profile and enforces password history | Owner/`ADMIN` |
+| `POST` | `/teachers/register`| Creates teacher + temp password + email | `ADMIN` only |
+| `POST` | `/guests/register`| Creates guest + temp password + email | `ADMIN` only |

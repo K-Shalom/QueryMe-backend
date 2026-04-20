@@ -19,31 +19,37 @@ public class UserDetailsImpl implements UserDetails {
     private String name;
     private UserTypes role;
 
+    private boolean mustResetPassword;
+
     @JsonIgnore
     private String password;
 
     private Collection<? extends GrantedAuthority> authorities;
 
     public UserDetailsImpl(UUID id, String email, String name, String password,
-                           UserTypes role,
+                           UserTypes role, boolean mustResetPassword,
                            Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.email = email;
         this.name = name;
         this.password = password;
         this.role = role;
+        this.mustResetPassword = mustResetPassword;
         this.authorities = authorities;
     }
 
     public static UserDetailsImpl build(User user) {
         GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name());
 
+        boolean mustReset = user.getMustResetPassword() != null && user.getMustResetPassword();
+
         return new UserDetailsImpl(
                 user.getId(),
                 user.getEmail(),
                 user.getName(),
                 user.getPasswordHash(),
-            user.getRole(),
+                user.getRole(),
+                mustReset,
                 Collections.singletonList(authority));
     }
 
@@ -54,6 +60,10 @@ public class UserDetailsImpl implements UserDetails {
 
     public UUID getId() {
         return id;
+    }
+
+    public boolean isMustResetPassword() {
+        return mustResetPassword;
     }
 
     public String getEmail() {

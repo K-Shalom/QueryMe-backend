@@ -20,6 +20,19 @@ spring:
         format_sql: false
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_AUTH}
+          starttls:
+            enable: ${MAIL_STARTTLS}
+          protocol: ${MAIL_PROTOCOL}
+
 server:
   port: ${APP_PORT:8085}
 

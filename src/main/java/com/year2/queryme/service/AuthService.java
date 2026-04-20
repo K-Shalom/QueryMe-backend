@@ -55,7 +55,8 @@ public class AuthService {
                 userDetails.getId(),
                 userDetails.getEmail(),
                 userDetails.getName(),
-                roles));
+                roles,
+                userDetails.isMustResetPassword()));
     }
 
     public ResponseEntity<?> registerUser(SignupRequest signUpRequest) {

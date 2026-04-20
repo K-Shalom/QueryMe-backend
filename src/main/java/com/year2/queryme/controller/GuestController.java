@@ -21,6 +21,7 @@ public class GuestController {
     private GuestRepository guestRepository;
 
     @PostMapping("/register")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public Guest register(@RequestBody Map<String, String> data) {
         return guestService.registerGuest(
                 data.get("email"),
@@ -30,11 +31,13 @@ public class GuestController {
     }
 
     @PutMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('GUEST', 'ADMIN')")
     public Guest update(@PathVariable Long id, @RequestBody Map<String, String> data) {
         return guestService.updateProfile(id, data);
     }
 
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public Page<Guest> getAll(Pageable pageable) {
         return guestRepository.findAll(pageable);
     }

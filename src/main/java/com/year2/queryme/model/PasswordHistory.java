@@ -1,6 +1,5 @@
 package com.year2.queryme.model;
 
-import com.year2.queryme.model.enums.UserTypes;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -8,43 +7,29 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(name = "password_histories")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class PasswordHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(unique = true, nullable = false)
-    private String email;
-
-    @Column(nullable = true)
-    private String name;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20, nullable = false)
-    private UserTypes role;
-
-    @Column(name = "must_reset_password")
-    @Builder.Default
-    private Boolean mustResetPassword = false;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private java.util.List<PasswordHistory> passwordHistories = new java.util.ArrayList<>();
-
     @Column(name = "created_at")
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
-
+    
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

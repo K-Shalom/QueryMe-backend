@@ -43,6 +43,12 @@ public class StudentService {
     @Autowired
     private CurrentUserService currentUserService;
 
+    @Autowired
+    private PasswordService passwordService;
+
+    @Autowired
+    private EmailService emailService;
+
     @Transactional
     public Student registerStudent(String email, String password, String fullName,
                                    Long courseId, Long classGroupId, String studentNumber) {
@@ -111,8 +117,15 @@ public class StudentService {
         if (data.containsKey("password")) {
             User user = student.getUser();
             if (user != null) {
-                user.setPasswordHash(passwordEncoder.encode(data.get("password")));
+                String newPassword = data.get("password");
+                if (passwordService.isPasswordUsed(user, newPassword)) {
+                    throw new RuntimeException("Cannot reuse a previous password");
+                }
+                String hash = passwordEncoder.encode(newPassword);
+                user.setPasswordHash(hash);
+                user.setMustResetPassword(false);
                 userRepository.save(user);
+                passwordService.recordPassword(user, hash);
             }
         }
         if (data.containsKey("courseId")) {
@@ -144,9 +157,7 @@ public class StudentService {
         if (email == null) {
             throw new IllegalArgumentException("Student email is required");
         }
-        if (request.getPassword() == null || request.getPassword().isBlank()) {
-            throw new IllegalArgumentException("Student password is required");
-        }
+        // Password can be null for admin-driven registration (will be auto-generated)
         if (fullName == null) {
             throw new IllegalArgumentException("Student fullName is required");
         }
@@ -176,13 +187,24 @@ public class StudentService {
     }
 
     private Student createStudent(StudentRegistrationRequest request) {
+        String password = request.getPassword();
+        boolean mustReset = false;
+        if (password == null || password.isBlank()) {
+            password = passwordService.generateTemporaryPassword();
+            mustReset = true;
+            emailService.sendTemporaryPassword(request.getEmail(), password);
+        }
+
+        String passwordHash = passwordEncoder.encode(password);
         User user = User.builder()
                 .email(request.getEmail())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .passwordHash(passwordHash)
                 .role(UserTypes.STUDENT)
                 .name(request.getFullName())
+                .mustResetPassword(mustReset)
                 .build();
         userRepository.save(user);
+        passwordService.recordPassword(user, passwordHash);
 
         Course course = request.getCourseId() != null
                 ? courseRepository.findById(request.getCourseId())
@@ -210,6 +232,15 @@ public class StudentService {
                 .build();
 
         return studentRepository.save(student);
+    }
+
+    @Transactional
+    public void deleteStudent(Long id) {
+        Student student = studentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Student not found with id: " + id));
+        
+        // Due to CascadeType.ALL on User relationship, deleting the student will delete the user
+        studentRepository.delete(student);
     }
 
     private String trimToNull(String value) {

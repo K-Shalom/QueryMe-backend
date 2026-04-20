@@ -27,6 +27,12 @@ public class AdminService {
     @Autowired
     private CurrentUserService currentUserService;
 
+    @Autowired
+    private PasswordService passwordService;
+
+    @Autowired
+    private EmailService emailService;
+
     @Transactional
     public Admin registerAdmin(String email, String password, String fullName) {
         return createAdmin(email, password, fullName, false);
@@ -63,8 +69,15 @@ public class AdminService {
         if (data.containsKey("password")) {
             User user = admin.getUser();
             if (user != null) {
-                user.setPasswordHash(passwordEncoder.encode(data.get("password")));
+                String newPassword = data.get("password");
+                if (passwordService.isPasswordUsed(user, newPassword)) {
+                    throw new RuntimeException("Cannot reuse a previous password");
+                }
+                String hash = passwordEncoder.encode(newPassword);
+                user.setPasswordHash(hash);
+                user.setMustResetPassword(false);
                 userRepository.save(user);
+                passwordService.recordPassword(user, hash);
             }
         }
 
@@ -76,13 +89,23 @@ public class AdminService {
             throw new IllegalArgumentException("Error: Email is already in use!");
         }
 
+        boolean mustReset = false;
+        if (password == null || password.isBlank()) {
+            password = passwordService.generateTemporaryPassword();
+            mustReset = true;
+            emailService.sendTemporaryPassword(email, password);
+        }
+
+        String passwordHash = passwordEncoder.encode(password);
         User user = User.builder()
                 .email(email)
-                .passwordHash(passwordEncoder.encode(password))
+                .passwordHash(passwordHash)
                 .role(UserTypes.ADMIN)
                 .name(fullName)
+                .mustResetPassword(mustReset)
                 .build();
         userRepository.save(user);
+        passwordService.recordPassword(user, passwordHash);
 
         Admin admin = Admin.builder()
                 .fullName(fullName)

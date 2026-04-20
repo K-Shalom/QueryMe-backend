@@ -78,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/signin").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/signup").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/bootstrap/super-admin").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/bootstrap/reset").permitAll()
                         .requestMatchers(HttpMethod.GET, "/courses").permitAll()
                         .requestMatchers(HttpMethod.GET, "/class-groups/**").permitAll()
 
@@ -97,9 +98,9 @@ public class SecurityConfig {
 
                         // ── TEACHER or ADMIN ───────────────────────────
                         .requestMatchers(HttpMethod.POST, "/students/register")
-                        .hasAnyRole("TEACHER", "ADMIN")
+                        .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/students/register/bulk")
-                        .hasAnyRole("TEACHER", "ADMIN")
+                        .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/students")
                         .hasAnyRole("TEACHER", "ADMIN")
                         .requestMatchers("/course-enrollments/**")

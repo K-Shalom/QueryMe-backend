@@ -20,11 +20,14 @@ public class JwtResponse {
   private String name;
   private List<String> roles;
 
-  public JwtResponse(String accessToken, UUID id, String email, String name, List<String> roles) {
+  private boolean mustResetPassword;
+
+  public JwtResponse(String accessToken, UUID id, String email, String name, List<String> roles, boolean mustResetPassword) {
     this.token = accessToken;
     this.id = id;
     this.email = email;
     this.name = name;
     this.roles = roles;
+    this.mustResetPassword = mustResetPassword;
   }
 }

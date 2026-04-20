@@ -27,16 +27,31 @@ public class TeacherService {
     @Autowired
     private CurrentUserService currentUserService;
 
+    @Autowired
+    private PasswordService passwordService;
+
+    @Autowired
+    private EmailService emailService;
+
     @Transactional
     public Teacher registerTeacher(String email, String password, String fullName, String department) {
-        // 1. Create User with BCrypt-encoded password
+        boolean mustReset = false;
+        if (password == null || password.isBlank()) {
+            password = passwordService.generateTemporaryPassword();
+            mustReset = true;
+            emailService.sendTemporaryPassword(email, password);
+        }
+
+        String passwordHash = passwordEncoder.encode(password);
         User user = User.builder()
                 .email(email)
-                .passwordHash(passwordEncoder.encode(password))
+                .passwordHash(passwordHash)
                 .role(UserTypes.TEACHER)
                 .name(fullName)
+                .mustResetPassword(mustReset)
                 .build();
         userRepository.save(user);
+        passwordService.recordPassword(user, passwordHash);
 
         // 2. Create Teacher linked to User
         Teacher teacher = Teacher.builder()
@@ -73,8 +88,15 @@ public class TeacherService {
         if (data.containsKey("password")) {
             User user = teacher.getUser();
             if (user != null) {
-                user.setPasswordHash(passwordEncoder.encode(data.get("password")));
+                String newPassword = data.get("password");
+                if (passwordService.isPasswordUsed(user, newPassword)) {
+                    throw new RuntimeException("Cannot reuse a previous password");
+                }
+                String hash = passwordEncoder.encode(newPassword);
+                user.setPasswordHash(hash);
+                user.setMustResetPassword(false);
                 userRepository.save(user);
+                passwordService.recordPassword(user, hash);
             }
         }
 
