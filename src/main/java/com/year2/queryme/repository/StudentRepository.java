@@ -28,6 +28,10 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 	List<StudentNameView> findStudentNamesByUserIds(@Param("userIds") Collection<UUID> userIds);
     boolean existsByStudentNumber(String studentNumber);
 
+    /** Returns all students whose linked user account has the STUDENT role. */
+    @Query("SELECT s FROM Student s WHERE s.user.role = com.year2.queryme.model.enums.UserTypes.STUDENT")
+    Page<Student> findAllStudents(Pageable pageable);
+
     @Query("""
             SELECT DISTINCT s FROM Student s
             JOIN CourseEnrollment ce ON s.id = ce.student.id

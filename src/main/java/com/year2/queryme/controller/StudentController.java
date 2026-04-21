@@ -57,6 +57,16 @@ public class StudentController {
         return studentRepository.findAll(pageable);
     }
 
+    /**
+     * Returns ALL registered students regardless of course assignment (for enrollment pickers).
+     * Filtered to only return users with the STUDENT role.
+     */
+    @GetMapping("/all")
+    @PreAuthorize("hasAnyRole('TEACHER', 'ADMIN')")
+    public Page<Student> getAllStudents(Pageable pageable) {
+        return studentRepository.findAllStudents(pageable);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('STUDENT', 'TEACHER', 'ADMIN')")
     public Student getById(@PathVariable String id) {

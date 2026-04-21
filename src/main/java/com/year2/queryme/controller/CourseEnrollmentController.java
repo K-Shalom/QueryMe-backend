@@ -31,7 +31,7 @@ public class CourseEnrollmentController {
     private com.year2.queryme.service.CurrentUserService currentUserService;
 
     @PostMapping
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public CourseEnrollment enrollStudent(
             @RequestParam(name = "courseId", required = false) String courseIdParam,
             @RequestParam(name = "course_id", required = false) String courseIdSnakeParam,
@@ -45,6 +45,16 @@ public class CourseEnrollmentController {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
 
+        // Teachers can only enroll into their own courses
+        if (currentUserService.hasRole(com.year2.queryme.model.enums.UserTypes.TEACHER)) {
+            String email = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getName();
+            if (!course.getTeacher().getUser().getEmail().equals(email)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Teachers can only enroll students into their own courses");
+            }
+        }
+
         Long studentId = resolveRequiredId("studentId", firstNonBlank(
                 studentIdParam,
                 studentIdSnakeParam,
@@ -52,8 +62,16 @@ public class CourseEnrollmentController {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
+        // Avoid duplicate enrollments
+        boolean alreadyEnrolled = courseEnrollmentRepository
+                .findByCourseIdAndStudentId(courseId, studentId)
+                .isPresent();
+        if (alreadyEnrolled) {
+            throw new RuntimeException("Student is already enrolled in this course");
+        }
+
         CourseEnrollment enrollment = CourseEnrollment.builder()
-                .id(UUID.randomUUID().toString())
+                .id(java.util.UUID.randomUUID().toString())
                 .course(course)
                 .student(student)
                 .build();
@@ -98,7 +116,7 @@ public class CourseEnrollmentController {
     }
     
     @DeleteMapping
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public void unenrollStudent(
             @RequestParam(name = "courseId", required = false) String courseIdParam,
             @RequestParam(name = "course_id", required = false) String courseIdSnakeParam,
@@ -113,6 +131,18 @@ public class CourseEnrollmentController {
                 studentIdParam,
                 studentIdSnakeParam,
                 valueFromBody(data, "studentId", "student_id")));
+
+        // Teachers can only unenroll from their own courses
+        if (currentUserService.hasRole(com.year2.queryme.model.enums.UserTypes.TEACHER)) {
+            Course course = courseRepository.findById(courseId)
+                    .orElseThrow(() -> new RuntimeException("Course not found"));
+            String email = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication().getName();
+            if (!course.getTeacher().getUser().getEmail().equals(email)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Teachers can only unenroll students from their own courses");
+            }
+        }
 
         CourseEnrollment enrollment = courseEnrollmentRepository.findByCourseIdAndStudentId(courseId, studentId)
                 .orElseThrow(() -> new RuntimeException("Enrollment not found"));
