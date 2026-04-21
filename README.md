@@ -121,6 +121,7 @@ This backend received a performance-focused update. No brand-new API paths were 
 
 ### Database Indexes Added
 
+
 Indexes were added via JPA entity metadata and are applied by Hibernate with the current `ddl-auto: update` strategy.
 
 - `submissions`
