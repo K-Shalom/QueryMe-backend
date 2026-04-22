@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,8 +36,8 @@ class ExamSessionExpirySchedulerTest {
         ExamSession session = ExamSession.builder()
                 .examId("44444444-4444-4444-4444-444444444444")
                 .studentId("55555555-5555-5555-5555-555555555555")
-                .startedAt(LocalDateTime.now().minusMinutes(10))
-                .expiresAt(LocalDateTime.now().minusMinutes(1))
+                .startedAt(Instant.now().minus(java.time.Duration.ofMinutes(10)))
+                .expiresAt(Instant.now().minus(java.time.Duration.ofMinutes(1)))
                 .build();
         ExamSession savedSession = examSessionRepository.save(session);
 

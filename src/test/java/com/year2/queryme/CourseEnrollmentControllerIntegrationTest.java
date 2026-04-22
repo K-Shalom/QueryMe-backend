@@ -20,7 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -81,7 +81,7 @@ public class CourseEnrollmentControllerIntegrationTest {
                 .fullName("Student One")
                 .firstName("Student")
                 .lastName("One")
-                .registeredAt(LocalDateTime.now())
+                .registeredAt(Instant.now())
                 .studentNumber("STU-001")
                 .user(buildUser("student@example.com", "Student One", UserTypes.STUDENT))
                 .build());
@@ -107,7 +107,7 @@ public class CourseEnrollmentControllerIntegrationTest {
                 .fullName("Student Two")
                 .firstName("Student")
                 .lastName("Two")
-                .registeredAt(LocalDateTime.now())
+                .registeredAt(Instant.now())
                 .studentNumber("STU-002")
                 .user(buildUser("student2@example.com", "Student Two", UserTypes.STUDENT))
                 .build());

@@ -23,7 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -140,7 +140,7 @@ class QueryServiceImplTest {
                 .id(sessionId.toString())
                 .examId(examId.toString())
                 .studentId(studentId.toString())
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
+                .expiresAt(Instant.now().plus(java.time.Duration.ofMinutes(10)))
                 .build();
 
         when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
@@ -219,7 +219,7 @@ class QueryServiceImplTest {
                 .id(sessionId.toString())
                 .examId(examId.toString())
                 .studentId(studentId.toString())
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
+                .expiresAt(Instant.now().plus(java.time.Duration.ofMinutes(10)))
                 .build();
 
         when(questionRepository.findById(questionId)).thenReturn(Optional.of(question));
