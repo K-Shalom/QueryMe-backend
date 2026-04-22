@@ -4,7 +4,7 @@ import com.year2.queryme.model.enums.QuestionResultStatus;
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -19,6 +19,6 @@ public class TeacherDashboardRowDto {
     private Integer maxScore;
     private QuestionResultStatus status;
     private String submittedQuery;
-    private LocalDateTime submittedAt;
+    private Instant submittedAt;
     private String teacherFeedback;
 }

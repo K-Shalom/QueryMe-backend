@@ -186,7 +186,7 @@ public class QueryServiceImpl implements QueryService {
             throw new IllegalArgumentException("Session is already submitted");
         }
 
-        if (session.getExpiresAt() != null && java.time.LocalDateTime.now().isAfter(session.getExpiresAt().plusSeconds(10))) {
+        if (session.getExpiresAt() != null && java.time.Instant.now().isAfter(session.getExpiresAt().plus(java.time.Duration.ofSeconds(10)))) {
             throw new IllegalArgumentException("Session has expired");
         }
     }

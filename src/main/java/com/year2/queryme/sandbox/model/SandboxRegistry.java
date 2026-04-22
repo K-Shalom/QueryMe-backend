@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -41,10 +41,10 @@ public class SandboxRegistry {
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
 
     @Column(name = "status", nullable = false, length = 20)
     private String status;

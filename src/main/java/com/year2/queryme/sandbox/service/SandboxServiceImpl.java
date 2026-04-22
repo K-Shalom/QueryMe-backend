@@ -21,6 +21,8 @@ import org.springframework.jdbc.core.ConnectionCallback;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Objects;
@@ -94,7 +96,7 @@ public class SandboxServiceImpl implements SandboxService {
         if (existingRegistry != null && "ACTIVE".equals(existingRegistry.getStatus())) {
             if (Objects.equals(existingRegistry.getSeedFingerprint(), seedFingerprint)) {
                 if (previewSandbox) {
-                    existingRegistry.setExpiresAt(LocalDateTime.now().plusMinutes(answerKeyCacheTtlMinutes));
+                    existingRegistry.setExpiresAt(Instant.now().plus(Duration.ofMinutes(answerKeyCacheTtlMinutes)));
                     registryRepo.save(existingRegistry);
                 }
                 log.info("Reusing existing active sandbox schema: {}", existingRegistry.getSchemaName());
@@ -269,13 +271,13 @@ public class SandboxServiceImpl implements SandboxService {
         return value == null ? "" : value.replace("'", "''");
     }
 
-    private LocalDateTime resolveExpiresAt(com.year2.queryme.model.Exam exam, boolean previewSandbox) {
+    private Instant resolveExpiresAt(com.year2.queryme.model.Exam exam, boolean previewSandbox) {
         if (previewSandbox) {
-            return LocalDateTime.now().plusMinutes(answerKeyCacheTtlMinutes);
+            return Instant.now().plus(Duration.ofMinutes(answerKeyCacheTtlMinutes));
         }
 
         return exam.getTimeLimitMins() != null
-                ? LocalDateTime.now().plusMinutes(exam.getTimeLimitMins())
+                ? Instant.now().plus(Duration.ofMinutes(exam.getTimeLimitMins()))
                 : null;
     }
 

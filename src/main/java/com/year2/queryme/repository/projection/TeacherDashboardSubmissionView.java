@@ -1,6 +1,6 @@
 package com.year2.queryme.repository.projection;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public interface TeacherDashboardSubmissionView {
@@ -10,6 +10,6 @@ public interface TeacherDashboardSubmissionView {
     Integer getScore();
     Boolean getIsCorrect();
     String getSubmittedQuery();
-    LocalDateTime getSubmittedAt();
+    Instant getSubmittedAt();
     String getTeacherFeedback();
 }

@@ -1,7 +1,7 @@
 package com.year2.queryme.model;
 import jakarta.persistence.*;
         import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -34,5 +34,5 @@ public class Result {
     private Integer score;
     private Integer maxScore;
     private Boolean isCorrect;
-    private LocalDateTime gradedAt;
+    private Instant gradedAt;
 }

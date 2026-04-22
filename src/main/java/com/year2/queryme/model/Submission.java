@@ -6,7 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -63,5 +63,5 @@ public class Submission {
 
     @CreationTimestamp
     @Column(name = "submitted_at", updatable = false)
-    private LocalDateTime submittedAt;
+    private Instant submittedAt;
 }

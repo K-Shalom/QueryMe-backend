@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Slf4j
@@ -26,7 +26,7 @@ public class SandboxCleanupScheduler {
         log.info("Running background cleanup for expired sandboxes...");
 
         List<SandboxRegistry> expiredSandboxes = registryRepo
-                .findByStatusAndExpiresAtBefore("ACTIVE", LocalDateTime.now());
+                .findByStatusAndExpiresAtBefore("ACTIVE", Instant.now());
 
         for (SandboxRegistry sandbox : expiredSandboxes) {
             try {

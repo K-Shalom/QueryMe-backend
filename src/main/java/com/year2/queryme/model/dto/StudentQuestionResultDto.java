@@ -4,7 +4,7 @@ import com.year2.queryme.model.enums.QuestionResultStatus;
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -19,7 +19,7 @@ public class StudentQuestionResultDto {
     private Integer maxScore;
     private QuestionResultStatus status;
     private Boolean isCorrect;
-    private LocalDateTime submittedAt;
+    private Instant submittedAt;
     private List<String> resultColumns;
     private List<Map<String, Object>> resultRows;
 }

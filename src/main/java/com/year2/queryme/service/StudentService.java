@@ -11,6 +11,7 @@ import com.year2.queryme.repository.CourseRepository;
 import com.year2.queryme.repository.StudentRepository;
 import com.year2.queryme.repository.UserRepository;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import com.year2.queryme.model.enums.UserTypes;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -224,7 +225,7 @@ public class StudentService {
                 .fullName(request.getFullName())
                 .firstName(firstName)
                 .lastName(lastName)
-                .registeredAt(LocalDateTime.now())
+                .registeredAt(Instant.now())
                 .studentNumber(request.getStudentNumber())
                 .user(user)
                 .course(course)
@@ -257,7 +258,7 @@ public class StudentService {
                 .fullName(request.getFullName())
                 .firstName(firstName)
                 .lastName(lastName)
-                .registeredAt(LocalDateTime.now())
+                .registeredAt(Instant.now())
                 .studentNumber(request.getRegistrationNumber())
                 .user(user)
                 .build();

@@ -21,6 +21,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -80,9 +81,9 @@ public class ExamSessionServiceImpl implements ExamSessionService {
             throw new RuntimeException("Maximum attempts reached for this exam");
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expiresAt = exam.getTimeLimitMins() != null
-                ? now.plusMinutes(exam.getTimeLimitMins())
+        Instant now = Instant.now();
+        Instant expiresAt = exam.getTimeLimitMins() != null
+                ? now.plus(java.time.Duration.ofMinutes(exam.getTimeLimitMins()))
                 : null;
 
         String sandboxSchema = sandboxService.provisionSandbox(
@@ -115,7 +116,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
             return ExamSessionMapper.toResponse(autoSubmit(session));
         }
 
-        session.setSubmittedAt(LocalDateTime.now());
+        session.setSubmittedAt(Instant.now());
         return ExamSessionMapper.toResponse(autoSubmit(session));
     }
 
@@ -170,16 +171,16 @@ public class ExamSessionServiceImpl implements ExamSessionService {
             throw new RuntimeException("Students cannot extend sessions");
         }
 
-        LocalDateTime newExpiresAt;
+        Instant newExpiresAt;
         if (session.getExpiresAt() != null) {
-            if (session.getExpiresAt().isBefore(LocalDateTime.now())) {
-                newExpiresAt = LocalDateTime.now().plusHours(extraHours);
+            if (session.getExpiresAt().isBefore(Instant.now())) {
+                newExpiresAt = Instant.now().plus(java.time.Duration.ofHours(extraHours));
             } else {
-                newExpiresAt = session.getExpiresAt().plusHours(extraHours);
+                newExpiresAt = session.getExpiresAt().plus(java.time.Duration.ofHours(extraHours));
             }
             session.setExpiresAt(newExpiresAt);
         } else {
-            session.setExpiresAt(LocalDateTime.now().plusHours(extraHours));
+            session.setExpiresAt(Instant.now().plus(java.time.Duration.ofHours(extraHours)));
         }
 
         // Re-open session if it was submitted
@@ -257,7 +258,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
     public void heartbeat(String sessionId) {
         ExamSession session = findById(sessionId);
         assertCurrentUserCanAccessSession(session);
-        session.setLastHeartbeatAt(LocalDateTime.now());
+        session.setLastHeartbeatAt(Instant.now());
         sessionRepository.save(session);
     }
 
@@ -289,7 +290,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
     private boolean isExpired(ExamSession session) {
         if (session.getExpiresAt() == null) return false;
         // 10-second grace period to account for network latency
-        return LocalDateTime.now().isAfter(session.getExpiresAt().plusSeconds(10));
+        return Instant.now().isAfter(session.getExpiresAt().plus(java.time.Duration.ofSeconds(10)));
     }
 
     private boolean isExpiredAndOpen(ExamSession session) {
@@ -298,7 +299,7 @@ public class ExamSessionServiceImpl implements ExamSessionService {
 
     private ExamSession autoSubmit(ExamSession session) {
         if (session.getSubmittedAt() == null) {
-            session.setSubmittedAt(session.getExpiresAt() != null ? session.getExpiresAt() : LocalDateTime.now());
+            session.setSubmittedAt(session.getExpiresAt() != null ? session.getExpiresAt() : Instant.now());
         }
 
         ExamSession savedSession = sessionRepository.save(session);

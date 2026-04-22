@@ -3,6 +3,7 @@ package com.year2.queryme.model.dto;
 import com.year2.queryme.model.enums.ExamStatus;
 import com.year2.queryme.model.enums.VisibilityMode;
 import lombok.Data;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Data
@@ -19,6 +20,6 @@ public class ExamResponse {
     private Integer questionsCount;
     private String seedSql;
     private String courseName;
-    private LocalDateTime createdAt;
-    private LocalDateTime publishedAt;
+    private Instant createdAt;
+    private Instant publishedAt;
 }

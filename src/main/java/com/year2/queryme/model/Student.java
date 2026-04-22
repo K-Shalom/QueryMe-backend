@@ -3,6 +3,7 @@ package com.year2.queryme.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 import java.util.UUID;
@@ -29,7 +30,7 @@ public class Student {
     private String lastName;
 
     @Column(name = "registered_at")
-    private LocalDateTime registeredAt;
+    private Instant registeredAt;
 
     @Column(name = "student_number", unique = true)
     private String studentNumber;

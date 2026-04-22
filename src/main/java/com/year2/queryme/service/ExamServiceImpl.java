@@ -13,6 +13,7 @@ import com.year2.queryme.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -172,7 +173,7 @@ public class ExamServiceImpl implements ExamService {
         }
 
         exam.setStatus(ExamStatus.PUBLISHED);
-        exam.setPublishedAt(LocalDateTime.now());
+        exam.setPublishedAt(Instant.now());
 
         return toResponse(examRepository.save(exam));
     }

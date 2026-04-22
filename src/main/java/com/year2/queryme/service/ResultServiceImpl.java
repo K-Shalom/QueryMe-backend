@@ -32,7 +32,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -221,7 +221,7 @@ public class ResultServiceImpl implements ResultService {
         result.setScore(score);
         result.setMaxScore(question.getMarks());
         result.setIsCorrect(Boolean.TRUE.equals(isCorrect));
-        result.setGradedAt(LocalDateTime.now());
+        result.setGradedAt(Instant.now());
 
         return resultRepository.save(result);
     }
@@ -233,7 +233,7 @@ public class ResultServiceImpl implements ResultService {
 
         if (exam.getVisibilityMode() == VisibilityMode.END_OF_EXAM) {
             return session.getSubmittedAt() != null
-                    || (session.getExpiresAt() != null && LocalDateTime.now().isAfter(session.getExpiresAt()))
+                    || (session.getExpiresAt() != null && Instant.now().isAfter(session.getExpiresAt()))
                     || exam.getStatus() == ExamStatus.CLOSED;
         }
 

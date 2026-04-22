@@ -2,6 +2,7 @@ package com.year2.queryme.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -31,13 +32,13 @@ public class ExamSession {
     private String studentId;
 
     @Column(name = "started_at")
-    private LocalDateTime startedAt;
+    private Instant startedAt;
 
     @Column(name = "submitted_at")
-    private LocalDateTime submittedAt;
+    private Instant submittedAt;
 
     @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
 
     @Column(name = "sandbox_schema", length = 100)
     private String sandboxSchema;
@@ -46,5 +47,5 @@ public class ExamSession {
     private String teacherFeedback;
 
     @Column(name = "last_heartbeat_at")
-    private LocalDateTime lastHeartbeatAt;
+    private Instant lastHeartbeatAt;
 }

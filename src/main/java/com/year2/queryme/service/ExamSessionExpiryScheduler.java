@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,11 +23,11 @@ public class ExamSessionExpiryScheduler {
     @Scheduled(fixedRate = 60000)
     public void autoSubmitExpiredSessions() {
         List<ExamSession> expiredSessions = examSessionRepository
-                .findBySubmittedAtIsNullAndExpiresAtBefore(LocalDateTime.now());
+                .findBySubmittedAtIsNullAndExpiresAtBefore(Instant.now());
 
         for (ExamSession session : expiredSessions) {
             try {
-                session.setSubmittedAt(session.getExpiresAt() != null ? session.getExpiresAt() : LocalDateTime.now());
+                session.setSubmittedAt(session.getExpiresAt() != null ? session.getExpiresAt() : Instant.now());
                 examSessionRepository.save(session);
                 sandboxService.teardownSandbox(
                         UUID.fromString(session.getExamId()),

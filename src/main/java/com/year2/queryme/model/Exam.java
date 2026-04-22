@@ -4,6 +4,7 @@ import com.year2.queryme.model.enums.ExamStatus;
 import com.year2.queryme.model.enums.VisibilityMode;
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -52,14 +53,14 @@ public class Exam {
     private String seedSql;
 
     @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "published_at")
-    private LocalDateTime publishedAt;
+    private Instant publishedAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Instant.now();
         this.status = ExamStatus.DRAFT;
         if (this.maxAttempts == null) this.maxAttempts = 1;
     }
